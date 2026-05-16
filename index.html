@@ -247,13 +247,14 @@ input,select,textarea{font:inherit;color:var(--c-text);}
   font-size:15px;font-weight:700;flex-shrink:0;}
 .person-info{flex:1;min-width:0;}
 .person-name{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.person-badges{display:flex;align-items:center;gap:8px;margin-top:1px;flex-wrap:wrap;}
-.person-badge-admin{font-size:10px;color:var(--c-warn);font-weight:600;}
-.person-badge-acct{display:inline-flex;align-items:center;gap:3px;font-size:10px;color:var(--c-success);font-weight:600;}
-.person-badge-acct .acct-icon{width:13px;height:13px;}
-.person-badge-acct .acct-icon svg{width:8px;height:8px;}
-.person-badge-noemail{display:inline-flex;align-items:center;gap:2px;font-size:10px;color:var(--c-text-3);}
-.person-badge-noemail svg{width:12px;height:12px;}
+.person-name-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.person-icons{display:inline-flex;align-items:center;gap:6px;}
+.tag-admin{font-size:10px;font-weight:700;color:var(--c-warn);
+  background:rgba(255,149,0,0.12);border-radius:5px;padding:2px 6px;letter-spacing:.3px;}
+.p-icon{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;}
+.p-icon svg{width:16px;height:16px;}
+.p-icon.pi-on{color:var(--c-success);}
+.p-icon.pi-off{color:var(--c-text-3);opacity:.35;}
 
 /* BALANCE MODAL */
 .bal-row{display:flex;align-items:center;justify-content:space-between;
@@ -443,6 +444,7 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
 .pr-reject{background:var(--c-bg);color:var(--c-danger);border:1px solid var(--c-border);}
 .pr-reject:active{background:var(--c-border);}
 
+.app-version{text-align:center;font-size:11px;color:var(--c-text-3);margin-top:20px;opacity:.6;}
 [hidden]{display:none!important;}
 </style>
 </head>
@@ -568,6 +570,7 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
       <p class="welcome-hint">Your registration is still pending. You'll receive an email once the admin approves your request.</p>
       <button class="btn-secondary full" id="pending-ok" style="margin-top:16px;">OK</button>
     </div>
+    <div class="app-version" id="app-version"></div>
   </div>
 </div>
 
@@ -949,6 +952,9 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
 <script>
 (function(){
 'use strict';
+
+// App version — bump on every release so we can verify what a device runs.
+var APP_VERSION='C-2.3';
 
 // ============================================================
 //  TOKEN MANAGEMENT — localStorage (own domain, no iframe issues)
@@ -1542,16 +1548,33 @@ function renderPeople(){
     var initials=((p.display_name||'?')[0]||'?').toUpperCase();
     h+='<div class="person-row" data-person-email="'+esc(p.email)+'">';
     h+='<div class="person-avatar-sm">'+esc(initials)+'</div>';
-    h+='<div class="person-info"><div class="person-name">'+esc(p.display_name)+'</div>';
-    h+='<div class="person-badges">';
-    if(isAdmin)h+='<span class="person-badge-admin">Admin</span>';
-    if(p.hasAccount)h+='<span class="person-badge-acct"><span class="acct-icon">'+acctSvg+'</span> Has account</span>';
-    if(!p.hasRealEmail)h+='<span class="person-badge-noemail"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M21 8V21H3V8l9 6 9-6"/><path d="M3 8l9-6 9 6"/></svg> No email</span>';
-    h+='</div></div></div>';
+    h+='<div class="person-info">';
+    h+='<div class="person-name-row">';
+    h+='<span class="person-name">'+esc(p.display_name)+'</span>';
+    h+=personIcons(p,isAdmin);
+    h+='</div>';
+    h+='</div></div>';
   });
   h+='</div>';
   el.innerHTML=h;
   if(d.isAdmin&&!d.settled){el.onclick=function(ev){var card=ev.target.closest('.person-row');if(card){var email=card.dataset.personEmail;var p=(d.participants||[]).find(function(pp){return pp.email===email;});if(p)openEditPerson(p);}};}
+}
+
+// Inline status icons shown next to a person's name:
+// Admin tag, email icon (green=has email / dim=none), account badge (green=has account / dim=none)
+function personIcons(p,isAdmin){
+  var h='<span class="person-icons">';
+  if(isAdmin)h+='<span class="tag-admin">Admin</span>';
+  // Email icon
+  var emCls=p.hasRealEmail?'pi-on':'pi-off';
+  h+='<span class="p-icon '+emCls+'" title="'+(p.hasRealEmail?'Has email':'No email')+'">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/></svg></span>';
+  // Account badge icon (shield/badge style)
+  var acCls=p.hasAccount?'pi-on':'pi-off';
+  h+='<span class="p-icon '+acCls+'" title="'+(p.hasAccount?'Has account':'No account')+'">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></span>';
+  h+='</span>';
+  return h;
 }
 
 // ============================================================
@@ -1828,6 +1851,7 @@ function wireAll(){
 
 setupPullToRefresh();
 wireAll();
+var verEl=$('app-version');if(verEl)verEl.textContent='Version '+APP_VERSION;
 startAuth();
 
 })();
