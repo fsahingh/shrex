@@ -1049,7 +1049,7 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
 'use strict';
 
 // App version — bump on every release so we can verify what a device runs.
-var APP_VERSION='C-2.5';
+var APP_VERSION='C-2.6';
 
 // ============================================================
 //  TOKEN MANAGEMENT — localStorage (own domain, no iframe issues)
@@ -1174,7 +1174,7 @@ function setupPullToRefresh(){
 }
 async function doPullRefresh(){
   if(state.currentView==='trip'&&state.trip){await refreshTrip(state.activeTab);}
-  else if(state.currentView==='trips'){try{var data=await call('bootData');state.trips=data.trips||[];state.pendingCount=data.pendingRegistrations||0;updatePendingBadge();renderTripList();toast('Refreshed');}catch(err){toast('Refresh failed',true);}}
+  else if(state.currentView==='trips'){try{var data=await call('bootData');state.trips=data.trips||[];state.pendingCount=data.pendingRegistrations||0;state.pendingRequests=data.pendingRequests||0;updatePendingBadge();updateRequestsBadge();renderTripList();toast('Refreshed');}catch(err){toast('Refresh failed',true);}}
 }
 
 // ============================================================
@@ -1196,7 +1196,7 @@ function updateFab(){
 async function refreshTrip(tabToKeep){
   if(!state.trip)return;tabToKeep=tabToKeep||state.activeTab||'settlement';
   showSpinner('Refreshing data…');
-  try{var data=await call('getFullTripData',[state.trip.trip_id]);if(!data){toast('Failed to refresh.',true);hideSpinner();return;}state.trip=data;$('trip-name-pill').textContent=data.name;renderSettlement();renderExpenses();renderPeople();switchTab(tabToKeep);}catch(err){toast(err.message||'Refresh failed',true);}hideSpinner();
+  try{var data=await call('getFullTripData',[state.trip.trip_id]);if(!data){toast('Failed to refresh.',true);hideSpinner();return;}state.trip=data;if(data.pendingRequests!=null){state.pendingRequests=data.pendingRequests;updateRequestsBadge();}$('trip-name-pill').textContent=data.name;renderSettlement();renderExpenses();renderPeople();switchTab(tabToKeep);}catch(err){toast(err.message||'Refresh failed',true);}hideSpinner();
 }
 
 // ============================================================
@@ -1672,7 +1672,7 @@ async function deleteTrip(){var tripId=$('et-id').value;var ok=await confirm_('D
 // ============================================================
 async function openTrip(tripId){
   if(busy)return;busy=true;hide('view-trips');show('view-trip');state.currentView='trip';showSpinner('Loading trip…');
-  try{var data=await call('getFullTripData',[tripId]);if(!data){toast('Failed to load trip.',true);busy=false;hideSpinner();return;}state.trip=data;$('trip-name-pill').textContent=data.name;call('setLastTrip',[tripId]);state.activeTab='settlement';renderSettlement();renderExpenses();renderPeople();switchTab('settlement');}catch(err){toast(err.message||'Error',true);}hideSpinner();busy=false;
+  try{var data=await call('getFullTripData',[tripId]);if(!data){toast('Failed to load trip.',true);busy=false;hideSpinner();return;}state.trip=data;if(data.pendingRequests!=null){state.pendingRequests=data.pendingRequests;}updateRequestsBadge();$('trip-name-pill').textContent=data.name;call('setLastTrip',[tripId]);state.activeTab='settlement';renderSettlement();renderExpenses();renderPeople();switchTab('settlement');}catch(err){toast(err.message||'Error',true);}hideSpinner();busy=false;
 }
 
 // ============================================================
@@ -2225,7 +2225,7 @@ function wireAll(){
   $('btn-home').onclick=function(){hide('view-trip');show('view-trips');state.currentView='trips';if(state.trip)show('btn-back');renderTripList();updateFab();};
   $('btn-back').onclick=function(){if(state.trip){hide('view-trips');show('view-trip');state.currentView='trip';switchTab(state.activeTab);updateFab();}};
   $('btn-refresh').onclick=function(){refreshTrip(state.activeTab);};
-  $('btn-refresh-trips').onclick=async function(){showSpinner('Refreshing trips…');try{var data=await call('bootData');state.trips=data.trips||[];state.pendingCount=data.pendingRegistrations||0;updatePendingBadge();renderTripList();toast('Refreshed');}catch(err){toast('Refresh failed',true);}hideSpinner();};
+  $('btn-refresh-trips').onclick=async function(){showSpinner('Refreshing trips…');try{var data=await call('bootData');state.trips=data.trips||[];state.pendingCount=data.pendingRegistrations||0;state.pendingRequests=data.pendingRequests||0;updatePendingBadge();updateRequestsBadge();renderTripList();toast('Refreshed');}catch(err){toast('Refresh failed',true);}hideSpinner();};
   $('btn-trip-pill').onclick=openSwitchTrip;
   qsa('.tab').forEach(function(t){t.onclick=function(){switchTab(t.dataset.tab);};});
   var acctHandler=function(){showAccountMenu();};
