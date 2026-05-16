@@ -234,7 +234,9 @@ input,select,textarea{font:inherit;color:var(--c-text);}
 .exp-badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 6px;
   border-radius:4px;margin-left:6px;text-transform:uppercase;}
 .exp-badge.pending{background:#fff3e0;color:#e65100;}
-@media(prefers-color-scheme:dark){.exp-badge.pending{background:#3a2a10;color:#ffb74d;}}
+.exp-badge.req{background:#e3f0ff;color:#0a58ca;}
+@media(prefers-color-scheme:dark){.exp-badge.pending{background:#3a2a10;color:#ffb74d;}.exp-badge.req{background:#10243a;color:#6db3ff;}}
+.exp-card.req-flagged{border-left:3px solid var(--c-tint);}
 .exp-approve-row{display:flex;margin-top:8px;padding-top:8px;border-top:0.5px solid var(--c-border);}
 .exp-btn-approve{font-size:13px;font-weight:600;padding:6px 14px;border-radius:8px;
   color:var(--c-success);background:#e8f8ee;}
@@ -451,6 +453,35 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
   background:var(--c-danger);color:#fff;font-size:11px;font-weight:700;
   border-radius:9px;display:flex;align-items:center;justify-content:center;
   padding:0 5px;line-height:1;}
+/* Bell turns orange when there are pending requests */
+#btn-requests.has-pending,#btn-requests-2.has-pending{color:var(--c-warn);}
+#btn-requests.has-pending .badge,#btn-requests-2.has-pending .badge{background:var(--c-warn);}
+
+/* REQUEST CARDS */
+.req-card{background:var(--c-card);border-radius:var(--r);padding:16px;
+  margin-bottom:12px;box-shadow:var(--shadow);}
+.req-card-head{display:flex;justify-content:space-between;align-items:baseline;}
+.req-trip{font-size:16px;font-weight:700;}
+.req-date{font-size:12px;color:var(--c-text-3);}
+.req-by{font-size:13px;color:var(--c-text-2);margin:2px 0 12px;}
+.req-diff{background:var(--c-bg);border-radius:var(--r-sm);padding:4px 12px;}
+.req-field{padding:9px 0;border-bottom:0.5px solid var(--c-border);}
+.req-field:last-child{border-bottom:none;}
+.req-field-label{font-size:11px;font-weight:600;color:var(--c-text-3);
+  text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px;}
+.req-field-vals{font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.req-field.changed .req-field-label{color:var(--c-tint);}
+.req-old{color:var(--c-danger);text-decoration:line-through;opacity:.8;}
+.req-arrow{color:var(--c-text-3);font-weight:700;}
+.req-new{color:var(--c-success);font-weight:600;}
+.req-same{color:var(--c-text);}
+.req-actions{display:flex;gap:10px;margin-top:14px;}
+.req-actions button{flex:1;padding:11px;font-size:14px;font-weight:600;
+  border-radius:10px;min-height:42px;}
+.req-approve{background:var(--c-success);color:#fff;}
+.req-approve:active{opacity:.85;}
+.req-reject{background:var(--c-bg);color:var(--c-danger);border:1px solid var(--c-border);}
+.req-reject:active{background:var(--c-border);}
 
 /* PENDING REGISTRATION CARDS */
 .pr-card{background:var(--c-bg);border-radius:var(--r-sm);padding:14px;margin-bottom:10px;}
@@ -620,6 +651,10 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
       <span class="header-title">Trips</span>
     </div>
     <div class="header-right">
+      <button class="header-btn" id="btn-requests" title="Change Requests" hidden>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="badge" id="requests-badge">0</span>
+      </button>
       <button class="header-btn" id="btn-pending-regs" title="Pending Registrations" hidden>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
         <span class="badge" id="pending-badge">0</span>
@@ -653,6 +688,10 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
       </button>
     </div>
     <div class="header-right">
+      <button class="header-btn" id="btn-requests-2" title="Change Requests" hidden>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="badge" id="requests-badge-2">0</span>
+      </button>
       <button class="header-btn" id="btn-directory-2" title="Directory" hidden>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><circle cx="12" cy="9" r="2.2"/><path d="M8.5 15c0-1.8 1.6-3 3.5-3s3.5 1.2 3.5 3"/></svg>
       </button>
@@ -671,6 +710,23 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
     <div id="tab-expenses" hidden></div>
     <div id="tab-people" hidden></div>
   </div>
+</div>
+
+<!-- REQUESTS VIEW -->
+<div id="view-requests" hidden>
+  <div class="header">
+    <div class="header-left">
+      <button class="header-btn" id="btn-requests-back" title="Back">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <button class="header-btn" id="btn-requests-refresh" title="Refresh">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      </button>
+      <span class="header-title">Change Requests</span>
+    </div>
+    <div class="header-right"></div>
+  </div>
+  <div class="content" id="requests-content"></div>
 </div>
 
 <!-- FAB -->
@@ -974,23 +1030,6 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
   </div>
 </div>
 
-<!-- REQUEST MODAL -->
-<div class="modal" id="modal-request" hidden>
-  <div class="modal-backdrop"></div>
-  <div class="modal-sheet"><div class="modal-handle"></div>
-    <div class="modal-title">Request a Change</div>
-    <div class="modal-body">
-      <label class="field-label">Describe what you'd like changed</label>
-      <textarea id="rq-text" class="field" rows="4" maxlength="500" placeholder="e.g. Please update the dinner amount to $45…"></textarea>
-      <div class="err" id="rq-error" hidden></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-secondary" id="rq-cancel">Cancel</button>
-      <button class="btn-primary" id="rq-send">Send</button>
-    </div>
-  </div>
-</div>
-
 <!-- CONFIRM -->
 <div class="modal" id="modal-confirm" hidden>
   <div class="modal-backdrop"></div>
@@ -1010,7 +1049,7 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
 'use strict';
 
 // App version — bump on every release so we can verify what a device runs.
-var APP_VERSION='C-2.4';
+var APP_VERSION='C-2.5';
 
 // ============================================================
 //  TOKEN MANAGEMENT — localStorage (own domain, no iframe issues)
@@ -1307,9 +1346,10 @@ async function boot(){
     if(!data){toast('Failed to load.',true);return;}
     state.user=data.user||{};state.trips=data.trips||[];
     state.pendingCount=data.pendingRegistrations||0;
+    state.pendingRequests=data.pendingRequests||0;
     var dn=state.user.displayName||state.user.email||'?';
     $('avatar-name').textContent=dn;$('avatar-name-2').textContent=dn;
-    updatePendingBadge();updateDirectoryButton();
+    updatePendingBadge();updateDirectoryButton();updateRequestsBadge();
     renderTripList();$('splash').classList.add('fade-out');setTimeout(function(){hide('splash');},300);
     if(state.trips.length>0){
       var last=data.lastTripId;var target=null;
@@ -1391,6 +1431,132 @@ function renderDirectoryList(query){
       },true);
     }
   };
+}
+
+// ============================================================
+//  CHANGE REQUESTS (admin)
+// ============================================================
+function updateRequestsBadge(){
+  // Bell shows for anyone who administers at least one trip (or global admin)
+  var isAnyAdmin=state.user&&(state.user.isGlobalAdmin||
+    (state.trips||[]).some(function(t){return t.isAdmin;}));
+  var n=state.pendingRequests||0;
+  [['btn-requests','requests-badge'],['btn-requests-2','requests-badge-2']].forEach(function(pair){
+    var btn=$(pair[0]),badge=$(pair[1]);
+    if(!btn)return;
+    if(isAnyAdmin){
+      show(btn);
+      btn.classList.toggle('has-pending',n>0);
+      if(n>0){badge.textContent=n;show(badge);}else{hide(badge);}
+    }else{hide(btn);}
+  });
+}
+
+function fmtAmt(n){return '$'+Number(n||0).toFixed(2);}
+
+async function openRequestsPage(){
+  state.returnView=state.currentView; // remember where we came from
+  hide('view-trips');hide('view-trip');
+  show('view-requests');state.currentView='requests';
+  updateFab();
+  $('requests-content').innerHTML='<div class="loading">Loading requests…</div>';
+  await loadRequests();
+}
+async function loadRequests(){
+  try{
+    var list=await call('listExpenseRequests');
+    state.requests=list||[];
+    renderRequests();
+  }catch(err){
+    $('requests-content').innerHTML='<div class="empty-state"><div class="empty-title">Could not load</div><div class="empty-sub">'+esc(err.message||'Error')+'</div></div>';
+  }
+}
+function renderRequests(){
+  var el=$('requests-content');
+  var list=state.requests||[];
+  if(list.length===0){
+    el.innerHTML='<div class="empty-state"><div class="empty-title">No pending requests</div><div class="empty-sub">Change requests from members will appear here.</div></div>';
+    return;
+  }
+  var h='';
+  list.forEach(function(rq){
+    h+='<div class="req-card glass-card" data-req="'+rq.request_id+'">';
+    h+='<div class="req-card-head"><span class="req-trip">'+esc(rq.trip_name)+'</span>'
+      +'<span class="req-date">'+shortDate(rq.requested_at)+'</span></div>';
+    h+='<div class="req-by">Requested by '+esc(rq.requested_by_name)+'</div>';
+    h+=renderRequestDiff(rq.old,rq.new);
+    h+='<div class="req-actions">'
+      +'<button class="req-reject" data-req-reject="'+rq.request_id+'">Reject</button>'
+      +'<button class="req-approve" data-req-approve="'+rq.request_id+'">Approve</button>'
+      +'</div>';
+    h+='</div>';
+  });
+  el.innerHTML=h;
+  el.onclick=function(ev){
+    var ap=ev.target.closest('[data-req-approve]');
+    var rj=ev.target.closest('[data-req-reject]');
+    if(ap)handleApproveRequest(ap.dataset.reqApprove);
+    if(rj)handleRejectRequest(rj.dataset.reqReject);
+  };
+}
+// Renders a before/after comparison; only changed fields are highlighted.
+function renderRequestDiff(o,n){
+  var h='<div class="req-diff">';
+  function fieldRow(label,oldVal,newVal,changed){
+    h+='<div class="req-field'+(changed?' changed':'')+'">';
+    h+='<div class="req-field-label">'+label+'</div>';
+    if(changed){
+      h+='<div class="req-field-vals"><span class="req-old">'+oldVal+'</span>'
+        +'<span class="req-arrow">→</span><span class="req-new">'+newVal+'</span></div>';
+    }else{
+      h+='<div class="req-field-vals"><span class="req-same">'+oldVal+'</span></div>';
+    }
+    h+='</div>';
+  }
+  fieldRow('Description',esc(o.description),esc(n.description),o.description!==n.description);
+  fieldRow('Amount',fmtAmt(o.amount),fmtAmt(n.amount),Number(o.amount)!==Number(n.amount));
+  fieldRow('Paid by',esc(o.paid_by_name),esc(n.paid_by_name),o.paid_by!==n.paid_by);
+  var oSplit=(o.split_with_names||[]).slice().sort().join(', ')||'Everyone';
+  var nSplit=(n.split_with_names||[]).slice().sort().join(', ')||'Everyone';
+  fieldRow('Split between',esc(oSplit),esc(nSplit),oSplit!==nSplit);
+  h+='</div>';
+  return h;
+}
+async function handleApproveRequest(reqId){
+  var ok=await confirm_('Approve this change? The expense will be updated.');if(!ok)return;
+  if(busy)return;busy=true;showSpinner('Applying change…');
+  try{
+    await call('approveExpenseRequest',[reqId]);
+    toast('Change applied');
+    state.pendingRequests=Math.max(0,(state.pendingRequests||1)-1);
+    updateRequestsBadge();
+    await loadRequests();
+    // refresh current trip data if loaded
+    if(state.trip){try{var d=await call('getFullTripData',[state.trip.trip_id]);if(d){state.trip=d;renderSettlement();renderExpenses();renderPeople();}}catch(e){}}
+  }catch(err){toast(err.message||'Error',true);}
+  hideSpinner();busy=false;
+}
+async function handleRejectRequest(reqId){
+  var ok=await confirm_('Reject this change request?');if(!ok)return;
+  if(busy)return;busy=true;showSpinner('Rejecting…');
+  try{
+    await call('rejectExpenseRequest',[reqId]);
+    toast('Request rejected');
+    state.pendingRequests=Math.max(0,(state.pendingRequests||1)-1);
+    updateRequestsBadge();
+    await loadRequests();
+    if(state.trip){try{var d=await call('getFullTripData',[state.trip.trip_id]);if(d){state.trip=d;renderExpenses();}}catch(e){}}
+  }catch(err){toast(err.message||'Error',true);}
+  hideSpinner();busy=false;
+}
+function exitRequestsPage(){
+  hide('view-requests');
+  if(state.trip&&state.returnView==='trip'){
+    show('view-trip');state.currentView='trip';switchTab(state.activeTab);
+  }else{
+    show('view-trips');state.currentView='trips';renderTripList();
+  }
+  updateFab();
 }
 
 async function openPendingRegs(){
@@ -1543,7 +1709,6 @@ function renderSettlement(){
     else if(s.totalCost>0){h+='<div class="empty-state"><div class="empty-title">All settled up!</div><div class="empty-sub">No payments needed.</div></div>';}
     else{h+='<div class="empty-state"><div class="empty-title">No expenses yet</div><div class="empty-sub">Add expenses to see settlements.</div></div>';}
     if(d.isAdmin&&s.totalCost>0){h+='<div class="action-strip"><button class="btn-primary full" id="btn-settle">🔒 Settle this trip</button></div>';}
-    if(!d.isAdmin){h+='<div class="action-strip"><button class="btn-secondary full" id="btn-request">📝 Request a change</button></div>';}
   }
   el.innerHTML=h;
   var sy=$('stat-you-paid');if(sy)sy.onclick=function(){openYouPaidModal();};
@@ -1553,7 +1718,6 @@ function renderSettlement(){
   var btnSettle=$('btn-settle');if(btnSettle)btnSettle.onclick=async function(){var ok=await confirm_('Settle this trip?');if(!ok)return;showSpinner('Settling…');try{await call('settleTrip',[d.trip_id]);toast('Trip settled!');}catch(err){toast(err.message||'Error',true);}await refreshTrip('settlement');};
   var btnUnsettle=$('btn-unsettle');if(btnUnsettle)btnUnsettle.onclick=async function(){var ok=await confirm_('Reopen this trip?');if(!ok)return;showSpinner('Reopening…');try{await call('unsettleTrip',[d.trip_id]);toast('Trip reopened');}catch(err){toast(err.message||'Error',true);}await refreshTrip('settlement');};
   var btnShare=$('btn-share');if(btnShare)btnShare.onclick=function(){openEmailSelectModal();};
-  var btnReq=$('btn-request');if(btnReq)btnReq.onclick=openRequest;
 }
 
 function renderGroupedTx(transactions){
@@ -1612,12 +1776,18 @@ function renderExpenses(){
   var d=state.trip;if(!d)return;var el=$('tab-expenses');var h='';var expenses=d.expenses||[];
   if(expenses.length===0){h+='<div class="empty-state"><div class="empty-title">No expenses</div><div class="empty-sub">Tap + to add your first expense.</div></div>';}
   else{expenses.forEach(function(e){
-    h+='<div class="exp-card'+(e.status==='pending'?' pending':'')+'">';
+    h+='<div class="exp-card'+(e.status==='pending'?' pending':'')+(e.hasPendingRequest?' req-flagged':'')+'">';
     h+='<div class="exp-row"><div class="exp-left"><div class="exp-desc">'+esc(e.description)+'</div>';
     h+='<div class="exp-meta">Paid by '+esc(e.paid_by_name)+' · '+shortDate(e.added_at);
     if(e.status==='pending')h+='<span class="exp-badge pending">Pending</span>';
+    if(e.hasPendingRequest)h+='<span class="exp-badge req">Change requested</span>';
     h+='</div></div><div class="exp-right"><span class="exp-amount">'+fmt(e.amount)+'</span>';
-    if(e.canEdit&&!d.settled)h+='<button class="exp-edit-btn" data-action="edit" data-rowid="'+e.row_id+'" title="Edit">'+pencilSvg+'</button>';
+    // Admin: direct edit. Non-admin: request-change edit (only if allowed).
+    if(e.canEdit&&!d.settled){
+      h+='<button class="exp-edit-btn" data-action="edit" data-rowid="'+e.row_id+'" title="Edit">'+pencilSvg+'</button>';
+    }else if(e.canRequestChange){
+      h+='<button class="exp-edit-btn" data-action="request" data-rowid="'+e.row_id+'" title="Request a change">'+pencilSvg+'</button>';
+    }
     h+='</div></div>';
     if(e.status==='pending'&&d.isAdmin)h+='<div class="exp-approve-row"><button class="exp-btn-approve" data-action="approve" data-rowid="'+e.row_id+'">✓ Approve</button></div>';
     h+='</div>';
@@ -1637,15 +1807,62 @@ function populateSplitList(selectedEmails){
     el.appendChild(item);
   });
 }
-function openExpenseModal(exp){
+// expenseModalMode: 'add' | 'edit' | 'request'
+var expenseModalMode='add';
+var expenseOriginal=null; // snapshot for request-mode change detection
+function openExpenseModal(exp,mode){
   var d=state.trip;if(!d)return;var sel=$('ex-paid-by');sel.innerHTML='';
   d.participants.forEach(function(p){var o=document.createElement('option');o.value=p.email;o.textContent=p.short_name||p.display_name;sel.appendChild(o);});
-  if(exp){$('ex-title').textContent='Edit Expense';$('ex-row-id').value=exp.row_id;$('ex-desc').value=exp.description;$('ex-amount').value=exp.amount;sel.value=exp.paid_by;
+  expenseModalMode=mode||(exp?'edit':'add');
+  expenseOriginal=null;
+  if(exp){
+    $('ex-row-id').value=exp.row_id;$('ex-desc').value=exp.description;$('ex-amount').value=exp.amount;sel.value=exp.paid_by;
     if(exp.split_with_all||!exp.split_with||exp.split_with.length===0){qs('input[name="split-mode"][value="everyone"]').checked=true;hide('ex-split-wrap');}
     else{qs('input[name="split-mode"][value="custom"]').checked=true;show('ex-split-wrap');populateSplitList(exp.split_with);}
-    if(exp.canDelete){show('ex-delete-wrap');}else{hide('ex-delete-wrap');}
-  }else{$('ex-title').textContent='Add Expense';$('ex-row-id').value='';$('ex-desc').value='';$('ex-amount').value='';sel.value=d.currentUser.email;qs('input[name="split-mode"][value="everyone"]').checked=true;hide('ex-split-wrap');hide('ex-delete-wrap');}
+  }else{
+    $('ex-row-id').value='';$('ex-desc').value='';$('ex-amount').value='';sel.value=d.currentUser.email;
+    qs('input[name="split-mode"][value="everyone"]').checked=true;hide('ex-split-wrap');
+  }
+  // Title, delete button, save button label depend on mode
+  if(expenseModalMode==='request'){
+    $('ex-title').textContent='Request a Change';
+    hide('ex-delete-wrap');
+    $('ex-save').textContent='Send Change Request';
+    $('ex-save').disabled=true; // enabled only when something changes
+    expenseOriginal=readExpenseForm();
+  }else{
+    $('ex-title').textContent=exp?'Edit Expense':'Add Expense';
+    if(exp&&exp.canDelete){show('ex-delete-wrap');}else{hide('ex-delete-wrap');}
+    $('ex-save').textContent='Save';
+    $('ex-save').disabled=false;
+  }
   hide('ex-error');openModal('modal-expense');
+}
+// Reads current form state into a comparable object
+function readExpenseForm(){
+  var splitMode=qs('input[name="split-mode"]:checked').value;
+  var splitWith=[];
+  if(splitMode==='custom'){
+    qsa('#ex-split-list input[type="checkbox"]:checked').forEach(function(cb){splitWith.push(cb.value);});
+  }
+  return {
+    description:$('ex-desc').value.trim(),
+    amount:$('ex-amount').value,
+    paid_by:$('ex-paid-by').value,
+    splitMode:splitMode,
+    splitWith:splitWith.slice().sort().join(',')
+  };
+}
+// In request mode, enable Send button only when the form differs from original
+function checkExpenseChanged(){
+  if(expenseModalMode!=='request'||!expenseOriginal)return;
+  var now=readExpenseForm();
+  var changed=now.description!==expenseOriginal.description
+    ||String(now.amount)!==String(expenseOriginal.amount)
+    ||now.paid_by!==expenseOriginal.paid_by
+    ||now.splitMode!==expenseOriginal.splitMode
+    ||now.splitWith!==expenseOriginal.splitWith;
+  $('ex-save').disabled=!changed;
 }
 async function saveExpense(){
   if(busy)return;var d=state.trip;if(!d)return;
@@ -1653,13 +1870,28 @@ async function saveExpense(){
   if(!desc){showErr('ex-error','Description required.');return;}if(!amount||Number(amount)<=0){showErr('ex-error','Valid amount required.');return;}
   var splitMode=qs('input[name="split-mode"]:checked').value;var splitWith=null;
   if(splitMode==='custom'){splitWith=[];qsa('#ex-split-list input[type="checkbox"]:checked').forEach(function(cb){splitWith.push(cb.value);});if(splitWith.length===0){showErr('ex-error','Select at least one person.');return;}}
-  busy=true;showSpinner('Saving…');var rowId=$('ex-row-id').value;
+  var rowId=$('ex-row-id').value;
+  busy=true;
+  if(expenseModalMode==='request'){
+    showSpinner('Sending request…');
+    try{
+      await call('submitExpenseChangeRequest',[d.trip_id,rowId,{
+        description:desc,amount:Number(amount),paid_by:paidBy,split_with:splitWith
+      }]);
+      toast('Change request sent');
+      closeModal('modal-expense');
+      await refreshTrip('expenses');
+    }catch(err){showErr('ex-error',err.message||'Error');hideSpinner();}
+    busy=false;return;
+  }
+  showSpinner('Saving…');
   try{if(rowId){await call('updateExpense',[d.trip_id,rowId,desc,Number(amount),paidBy,splitWith]);}else{await call('addExpense',[d.trip_id,desc,Number(amount),paidBy,splitWith]);}toast('Saved');closeModal('modal-expense');await refreshTrip('expenses');}
   catch(err){showErr('ex-error',err.message||'Error');hideSpinner();}busy=false;
 }
 async function deleteExpenseFromModal(){var rowId=$('ex-row-id').value;if(!rowId)return;var ok=await confirm_('Delete this expense?');if(!ok)return;if(busy)return;busy=true;showSpinner('Deleting…');try{await call('deleteExpense',[state.trip.trip_id,rowId]);toast('Deleted');closeModal('modal-expense');await refreshTrip('expenses');}catch(err){toast(err.message||'Error',true);hideSpinner();}busy=false;}
 async function approveExpense(rowId){if(busy)return;busy=true;showSpinner('Approving…');try{await call('approveExpense',[state.trip.trip_id,rowId]);toast('Approved');await refreshTrip(state.activeTab);}catch(err){toast(err.message||'Error',true);hideSpinner();}busy=false;}
-function editExpense(rowId){var exp=(state.trip.expenses||[]).find(function(e){return e.row_id===rowId;});if(exp)openExpenseModal(exp);}
+function editExpense(rowId){var exp=(state.trip.expenses||[]).find(function(e){return e.row_id===rowId;});if(exp)openExpenseModal(exp,'edit');}
+function requestExpenseChange(rowId){var exp=(state.trip.expenses||[]).find(function(e){return e.row_id===rowId;});if(exp)openExpenseModal(exp,'request');}
 
 // ============================================================
 //  PEOPLE TAB
@@ -1969,12 +2201,6 @@ async function saveNewTrip(){if(busy)return;var name=$('nt-name').value.trim();i
 function openSwitchTrip(){var el=$('sw-list');el.innerHTML='';state.trips.forEach(function(t){var isCurrent=state.trip&&String(state.trip.trip_id)===String(t.trip_id);var row=document.createElement('button');row.className='sw-row'+(isCurrent?' current':'');row.innerHTML='<div><div class="sw-row-name">'+esc(t.name)+'</div><div class="sw-row-sub">'+t.participantCount+' people</div></div>'+(isCurrent?'<span style="color:var(--c-tint);font-size:13px;font-weight:600;">Current</span>':'');row.onclick=function(){closeModal('modal-switch');if(!isCurrent)openTrip(t.trip_id);};el.appendChild(row);});openModal('modal-switch');}
 
 // ============================================================
-//  REQUEST
-// ============================================================
-function openRequest(){$('rq-text').value='';hide('rq-error');openModal('modal-request');}
-async function sendRequest(){if(busy)return;var text=$('rq-text').value.trim();if(!text){showErr('rq-error','Describe the change.');return;}busy=true;try{await call('submitRequest',[state.trip?state.trip.trip_id:null,'other',text]);toast('Request sent');closeModal('modal-request');}catch(err){showErr('rq-error',err.message||'Error');}busy=false;}
-
-// ============================================================
 //  ACCOUNT (sign out + invite)
 // ============================================================
 function showAccountMenu(){
@@ -2066,9 +2292,14 @@ function wireAll(){
   wireModal('modal-edit-person','ep-cancel');$('ep-save').onclick=saveEditPerson;$('ep-delete').onclick=deleteEditPerson;
   wireModal('modal-person-trips','pt-close');
   wireModal('modal-expense','ex-cancel');$('ex-save').onclick=saveExpense;$('ex-delete').onclick=deleteExpenseFromModal;
-  qsa('input[name="split-mode"]').forEach(function(radio){radio.onchange=function(){if(this.value==='custom'){show('ex-split-wrap');populateSplitList([]);}else{hide('ex-split-wrap');}};});
-  $('ex-select-all').onclick=function(){qsa('#ex-split-list input[type="checkbox"]').forEach(function(cb){cb.checked=true;});};
-  $('ex-select-none').onclick=function(){qsa('#ex-split-list input[type="checkbox"]').forEach(function(cb){cb.checked=false;});};
+  qsa('input[name="split-mode"]').forEach(function(radio){radio.onchange=function(){if(this.value==='custom'){show('ex-split-wrap');populateSplitList([]);}else{hide('ex-split-wrap');}checkExpenseChanged();};});
+  $('ex-select-all').onclick=function(){qsa('#ex-split-list input[type="checkbox"]').forEach(function(cb){cb.checked=true;});checkExpenseChanged();};
+  $('ex-select-none').onclick=function(){qsa('#ex-split-list input[type="checkbox"]').forEach(function(cb){cb.checked=false;});checkExpenseChanged();};
+  // Change detection for request mode
+  ['ex-desc','ex-amount','ex-paid-by'].forEach(function(id){
+    var el=$(id);if(el){el.oninput=checkExpenseChanged;el.onchange=checkExpenseChanged;}
+  });
+  $('ex-split-list').addEventListener('change',checkExpenseChanged);
   wireModal('modal-balance','bal-close');
   wireModal('modal-you-paid','yp-close');
   wireModal('modal-fair-share','fs-close');
@@ -2081,11 +2312,14 @@ function wireAll(){
   setupSearch('inv-search','inv-search-results',function(r){
     addToInviteList({email:r.email,firstName:r.first_name,lastName:r.last_name,displayName:r.display_name,hasAccount:r.hasAccount});
   },function(){
-    // exclude people already chosen, plus people who already have accounts are shown but blocked on select
     return inviteList.map(function(p){return p.email;});
   });
-  wireModal('modal-request','rq-cancel');$('rq-send').onclick=sendRequest;
-  document.addEventListener('click',function(ev){var btn=ev.target.closest('[data-action]');if(!btn)return;var action=btn.dataset.action;var rowId=btn.dataset.rowid;if(!rowId)return;if(action==='approve')approveExpense(rowId);else if(action==='edit')editExpense(rowId);});
+  // Requests page
+  $('btn-requests').onclick=openRequestsPage;
+  $('btn-requests-2').onclick=openRequestsPage;
+  $('btn-requests-back').onclick=exitRequestsPage;
+  $('btn-requests-refresh').onclick=function(){$('requests-content').innerHTML='<div class="loading">Loading requests…</div>';loadRequests();};
+  document.addEventListener('click',function(ev){var btn=ev.target.closest('[data-action]');if(!btn)return;var action=btn.dataset.action;var rowId=btn.dataset.rowid;if(!rowId)return;if(action==='approve')approveExpense(rowId);else if(action==='edit')editExpense(rowId);else if(action==='request')requestExpenseChange(rowId);});
 }
 
 setupPullToRefresh();
