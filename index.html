@@ -159,6 +159,7 @@ input,select,textarea{font:inherit;color:var(--c-text);}
 .trip-card-name{font-size:16px;font-weight:600;margin-bottom:3px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .trip-card-sub{font-size:12px;color:var(--c-text-2);}
+.trip-card-creator{font-size:11px;color:var(--c-tint);margin-top:3px;font-weight:500;}
 .trip-card-right{display:flex;align-items:center;gap:10px;flex-shrink:0;}
 .trip-edit-btn{width:32px;height:32px;border-radius:8px;display:flex;
   align-items:center;justify-content:center;color:var(--c-edit);
@@ -246,8 +247,11 @@ input,select,textarea{font:inherit;color:var(--c-text);}
   font-size:15px;font-weight:700;flex-shrink:0;}
 .person-info{flex:1;min-width:0;}
 .person-name{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.person-badges{display:flex;align-items:center;gap:6px;margin-top:1px;}
+.person-badges{display:flex;align-items:center;gap:8px;margin-top:1px;flex-wrap:wrap;}
 .person-badge-admin{font-size:10px;color:var(--c-warn);font-weight:600;}
+.person-badge-acct{display:inline-flex;align-items:center;gap:3px;font-size:10px;color:var(--c-success);font-weight:600;}
+.person-badge-acct .acct-icon{width:13px;height:13px;}
+.person-badge-acct .acct-icon svg{width:8px;height:8px;}
 .person-badge-noemail{display:inline-flex;align-items:center;gap:2px;font-size:10px;color:var(--c-text-3);}
 .person-badge-noemail svg{width:12px;height:12px;}
 
@@ -350,6 +354,18 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
 .acct-icon{display:inline-flex;align-items:center;justify-content:center;
   width:16px;height:16px;border-radius:50%;background:var(--c-success);color:#fff;flex-shrink:0;}
 .acct-icon svg{width:10px;height:10px;}
+
+/* INVITE — chips + divider */
+.inv-selected{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.inv-selected:empty{display:none;}
+.inv-chip{display:flex;align-items:center;gap:6px;background:var(--c-tint-bg);
+  color:var(--c-tint);border-radius:16px;padding:6px 8px 6px 12px;font-size:13px;font-weight:600;}
+.inv-chip button{width:18px;height:18px;border-radius:50%;background:var(--c-tint);
+  color:#fff;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;}
+.inv-divider{display:flex;align-items:center;text-align:center;margin:18px 0 6px;
+  color:var(--c-text-3);font-size:12px;}
+.inv-divider::before,.inv-divider::after{content:'';flex:1;height:0.5px;background:var(--c-border);}
+.inv-divider span{padding:0 12px;}
 
 /* PARTICIPANT ROW (new trip) */
 .participant-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
@@ -694,19 +710,27 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
 <div class="modal" id="modal-invite" hidden>
   <div class="modal-backdrop"></div>
   <div class="modal-sheet"><div class="modal-handle"></div>
-    <div class="modal-title">Send Invite</div>
+    <div class="modal-title">Invite People</div>
     <div class="modal-body">
+      <label class="field-label">Search existing people</label>
+      <div class="search-wrap">
+        <input type="text" id="inv-search" class="field" placeholder="Type a name to find people…" autocomplete="off">
+        <div id="inv-search-results" class="search-results" hidden></div>
+      </div>
+      <div id="inv-selected" class="inv-selected"></div>
+      <div class="inv-divider"><span>or add someone new</span></div>
       <label class="field-label">Email</label>
       <input type="email" id="inv-email" class="field" placeholder="email@example.com">
       <label class="field-label">First name</label>
       <input type="text" id="inv-first" class="field" placeholder="First name" maxlength="40">
       <label class="field-label">Last name</label>
       <input type="text" id="inv-last" class="field" placeholder="Last name" maxlength="40">
+      <button class="btn-text" id="inv-add-manual">+ Add this person to the list</button>
       <div class="err" id="inv-error" hidden></div>
     </div>
     <div class="modal-actions">
       <button class="btn-secondary" id="inv-cancel">Cancel</button>
-      <button class="btn-primary" id="inv-send">Send Invite</button>
+      <button class="btn-primary" id="inv-send">Send Invites</button>
     </div>
   </div>
 </div>
@@ -1229,6 +1253,8 @@ async function boot(){
       if(!target)target=state.trips[0];
       openTrip(target.trip_id);
     }else{state.currentView='trips';show('view-trips');updateFab();}
+    // Preload directory in background for instant search
+    loadDirectory();
   }catch(err){$('splash-sub').textContent='Error. Please refresh.';toast(err.message||'Load failed',true);}
 }
 
@@ -1313,10 +1339,17 @@ function renderTripList(){
     else{pillText='Even';}
     var editBtn='';
     if(t.isAdmin||state.user.isGlobalAdmin){editBtn='<button class="trip-edit-btn" data-trip-edit="'+t.trip_id+'" title="Edit">'+pencilSvg+'</button>';}
+    // Creator line — shown to global admin (so they see who owns each trip)
+    var creatorLine='';
+    if(state.user.isGlobalAdmin&&t.createdByName){
+      var who=t.createdByMe?'you':esc(t.createdByName);
+      creatorLine='<div class="trip-card-creator">Created by '+who+'</div>';
+    }
     card.innerHTML='<div class="trip-card-row">'
       +'<button class="trip-card-inner" data-trip-open="'+t.trip_id+'">'
       +'<div class="trip-card-name">'+esc(t.name)+'</div>'
       +'<div class="trip-card-sub">'+t.participantCount+' people · '+t.expenseCount+' expenses</div>'
+      +creatorLine
       +'</button>'
       +'<div class="trip-card-right">'
       +'<span class="balance-pill '+pillClass+'">'+pillText+'</span>'
@@ -1512,6 +1545,7 @@ function renderPeople(){
     h+='<div class="person-info"><div class="person-name">'+esc(p.display_name)+'</div>';
     h+='<div class="person-badges">';
     if(isAdmin)h+='<span class="person-badge-admin">Admin</span>';
+    if(p.hasAccount)h+='<span class="person-badge-acct"><span class="acct-icon">'+acctSvg+'</span> Has account</span>';
     if(!p.hasRealEmail)h+='<span class="person-badge-noemail"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M21 8V21H3V8l9 6 9-6"/><path d="M3 8l9-6 9 6"/></svg> No email</span>';
     h+='</div></div></div>';
   });
@@ -1524,23 +1558,89 @@ function renderPeople(){
 //  ADD PARTICIPANT
 // ============================================================
 var pendingAddPerson=null;
-async function saveAddPerson(){if(busy)return;var name=$('ap-name').value.trim();var email=$('ap-email').value.trim();if(!name&&!email){showErr('ap-error','Name or email required.');return;}var d=state.trip;if(d&&d.hasExpenses){pendingAddPerson={name:name,email:email};closeModal('modal-add-person');openIncludeModal();return;}busy=true;showSpinner('Adding…');try{await call('addParticipantToTrip',[d.trip_id,email,name,'none']);toast('Added');closeModal('modal-add-person');await refreshTrip('people');}catch(err){showErr('ap-error',err.message||'Error');hideSpinner();}busy=false;}
+async function saveAddPerson(){if(busy)return;var name=$('ap-name').value.trim();var email=$('ap-email').value.trim();if(!name&&!email){showErr('ap-error','Name or email required.');return;}var d=state.trip;if(d&&d.hasExpenses){pendingAddPerson={name:name,email:email};closeModal('modal-add-person');openIncludeModal();return;}busy=true;showSpinner('Adding…');try{await call('addParticipantToTrip',[d.trip_id,email,name,'none']);toast('Added');closeModal('modal-add-person');loadDirectory(true);await refreshTrip('people');}catch(err){showErr('ap-error',err.message||'Error');hideSpinner();}busy=false;}
 function openIncludeModal(){qs('input[name="include-mode"][value="none"]').checked=true;hide('ie-expense-list');hide('ie-error');var el=$('ie-expense-list');el.innerHTML='';(state.trip.expenses||[]).filter(function(e){return e.status==='active';}).forEach(function(e){var item=document.createElement('label');item.className='ie-item';item.innerHTML='<input type="checkbox" value="'+esc(e.row_id)+'" checked> <span class="ie-item-desc">'+esc(e.description)+'</span><span class="ie-item-amount">'+fmt(e.amount)+'</span>';el.appendChild(item);});openModal('modal-include-exp');}
-async function saveIncludeExpenses(){if(busy||!pendingAddPerson)return;var mode=qs('input[name="include-mode"]:checked').value;var includeIn='none';if(mode==='all')includeIn='all';else if(mode==='select'){var ids=[];qsa('#ie-expense-list input[type="checkbox"]:checked').forEach(function(cb){ids.push(cb.value);});includeIn=ids.join(',')||'none';}busy=true;showSpinner('Adding…');try{await call('addParticipantToTrip',[state.trip.trip_id,pendingAddPerson.email,pendingAddPerson.name,includeIn]);toast('Added');closeModal('modal-include-exp');pendingAddPerson=null;await refreshTrip('people');}catch(err){showErr('ie-error',err.message||'Error');hideSpinner();}busy=false;}
+async function saveIncludeExpenses(){if(busy||!pendingAddPerson)return;var mode=qs('input[name="include-mode"]:checked').value;var includeIn='none';if(mode==='all')includeIn='all';else if(mode==='select'){var ids=[];qsa('#ie-expense-list input[type="checkbox"]:checked').forEach(function(cb){ids.push(cb.value);});includeIn=ids.join(',')||'none';}busy=true;showSpinner('Adding…');try{await call('addParticipantToTrip',[state.trip.trip_id,pendingAddPerson.email,pendingAddPerson.name,includeIn]);toast('Added');closeModal('modal-include-exp');pendingAddPerson=null;loadDirectory(true);await refreshTrip('people');}catch(err){showErr('ie-error',err.message||'Error');hideSpinner();}busy=false;}
 
 // ============================================================
 //  EDIT PERSON
 // ============================================================
 var editingPerson=null;
 function openEditPerson(person){editingPerson=person;$('ep-first').value=person.first_name||'';$('ep-last').value=person.last_name||'';$('ep-email').value=person.hasRealEmail?person.email:'';hide('ep-error');openModal('modal-edit-person');}
-async function saveEditPerson(){if(busy||!editingPerson)return;var first=$('ep-first').value.trim();var last=$('ep-last').value.trim();var newEmail=$('ep-email').value.trim().toLowerCase();if(!first){showErr('ep-error','First name required.');return;}busy=true;showSpinner('Saving…');try{await call('updateParticipantInfo',[editingPerson.email,first,last]);if(newEmail&&newEmail!==editingPerson.email)await call('updateParticipantEmail',[state.trip.trip_id,editingPerson.email,newEmail]);toast('Updated');closeModal('modal-edit-person');await refreshTrip('people');}catch(err){showErr('ep-error',err.message||'Error');hideSpinner();}busy=false;}
+async function saveEditPerson(){if(busy||!editingPerson)return;var first=$('ep-first').value.trim();var last=$('ep-last').value.trim();var newEmail=$('ep-email').value.trim().toLowerCase();if(!first){showErr('ep-error','First name required.');return;}busy=true;showSpinner('Saving…');try{await call('updateParticipantInfo',[editingPerson.email,first,last]);if(newEmail&&newEmail!==editingPerson.email)await call('updateParticipantEmail',[state.trip.trip_id,editingPerson.email,newEmail]);toast('Updated');closeModal('modal-edit-person');loadDirectory(true);await refreshTrip('people');}catch(err){showErr('ep-error',err.message||'Error');hideSpinner();}busy=false;}
 async function deleteEditPerson(){if(!editingPerson)return;var ok=await confirm_('Remove '+esc(editingPerson.short_name||editingPerson.display_name)+'?');if(!ok)return;if(busy)return;busy=true;showSpinner('Removing…');try{await call('removeParticipantFromTrip',[state.trip.trip_id,editingPerson.email]);toast('Removed');closeModal('modal-edit-person');await refreshTrip('people');}catch(err){toast(err.message||'Error',true);hideSpinner();}busy=false;}
 
 // ============================================================
 //  INVITE
 // ============================================================
-function openInvite(){$('inv-email').value='';$('inv-first').value='';$('inv-last').value='';hide('inv-error');openModal('modal-invite');}
-async function sendInvite(){if(busy)return;var email=$('inv-email').value.trim();var first=$('inv-first').value.trim();var last=$('inv-last').value.trim();if(!email||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){showErr('inv-error','Valid email required.');return;}if(!first){showErr('inv-error','First name required.');return;}busy=true;showSpinner('Sending invite…');try{await call('sendInvite',[email,first,last]);toast('Invite sent to '+email);closeModal('modal-invite');}catch(err){showErr('inv-error',err.message||'Error');hideSpinner();}hideSpinner();busy=false;}
+// ============================================================
+//  INVITE — bulk invite with directory search
+// ============================================================
+var inviteList=[]; // {email, firstName, lastName, displayName, hasAccount}
+function openInvite(){
+  inviteList=[];
+  $('inv-email').value='';$('inv-first').value='';$('inv-last').value='';$('inv-search').value='';
+  hide('inv-error');hide('inv-search-results');
+  renderInviteList();
+  loadDirectory();
+  openModal('modal-invite');
+}
+function renderInviteList(){
+  var el=$('inv-selected');
+  if(inviteList.length===0){el.innerHTML='';hide(el);return;}
+  show(el);
+  el.innerHTML=inviteList.map(function(p,i){
+    return '<div class="inv-chip"><span>'+esc(p.displayName||p.email)+'</span>'
+      +'<button data-inv-remove="'+i+'">&times;</button></div>';
+  }).join('');
+  el.onclick=function(ev){
+    var btn=ev.target.closest('[data-inv-remove]');
+    if(btn){inviteList.splice(parseInt(btn.dataset.invRemove,10),1);renderInviteList();}
+  };
+}
+function addToInviteList(p){
+  var email=String(p.email||'').trim().toLowerCase();
+  if(!email||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){showErr('inv-error','That person has no valid email.');return false;}
+  if(p.hasAccount){showErr('inv-error',(p.displayName||email)+' already has an account.');return false;}
+  if(inviteList.some(function(x){return x.email===email;})){showErr('inv-error','Already in the list.');return false;}
+  hide('inv-error');
+  inviteList.push({
+    email:email,
+    firstName:p.firstName||(p.displayName||'').split(' ')[0]||'',
+    lastName:p.lastName||'',
+    displayName:p.displayName||email
+  });
+  renderInviteList();
+  return true;
+}
+function addManualToInviteList(){
+  var email=$('inv-email').value.trim().toLowerCase();
+  var first=$('inv-first').value.trim();
+  var last=$('inv-last').value.trim();
+  if(!email||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){showErr('inv-error','Valid email required.');return;}
+  if(!first){showErr('inv-error','First name required.');return;}
+  var dn=(first+' '+last).trim();
+  if(addToInviteList({email:email,firstName:first,lastName:last,displayName:dn,hasAccount:false})){
+    $('inv-email').value='';$('inv-first').value='';$('inv-last').value='';
+  }
+}
+async function sendInvites(){
+  if(busy)return;
+  // If manual fields are filled but not added, add them first
+  if($('inv-email').value.trim()){addManualToInviteList();}
+  if(inviteList.length===0){showErr('inv-error','Add at least one person.');return;}
+  busy=true;showSpinner('Sending invites…');
+  var sent=0,failed=0,failNames=[];
+  for(var i=0;i<inviteList.length;i++){
+    var p=inviteList[i];
+    try{await call('sendInvite',[p.email,p.firstName,p.lastName]);sent++;}
+    catch(err){failed++;failNames.push(p.displayName||p.email);}
+  }
+  loadDirectory(true);
+  hideSpinner();busy=false;
+  if(failed===0){toast(sent+' invite'+(sent!==1?'s':'')+' sent');closeModal('modal-invite');}
+  else{showErr('inv-error',sent+' sent, '+failed+' failed: '+failNames.join(', '));}
+}
 
 // ============================================================
 //  EMAIL SELECT + ADD MISSING EMAILS
@@ -1557,32 +1657,50 @@ async function sendSelectedEmails(){if(busy)return;var d=state.trip;if(!d)return
 // ============================================================
 //  DIRECTORY SEARCH
 // ============================================================
-function setupSearch(inputId,resultsId,onSelect){
-  var inp=$(inputId),res=$(resultsId);var timer=null;var lastQuery='';
-  function runSearch(){
-    var q=inp.value.trim();
+// ============================================================
+//  DIRECTORY CACHE — loaded once, searched locally (instant)
+// ============================================================
+var directoryCache=null;
+var directoryLoading=null;
+function loadDirectory(force){
+  if(directoryCache&&!force)return Promise.resolve(directoryCache);
+  if(directoryLoading)return directoryLoading;
+  directoryLoading=call('getDirectory').then(function(list){
+    directoryCache=list||[];directoryLoading=null;return directoryCache;
+  }).catch(function(){directoryLoading=null;return [];});
+  return directoryLoading;
+}
+
+// setupSearch(inputId, resultsId, onSelect, getExcludedEmails)
+// getExcludedEmails: optional function returning an array of emails to hide
+function setupSearch(inputId,resultsId,onSelect,getExcludedEmails){
+  var inp=$(inputId),res=$(resultsId);var timer=null;
+  function render(){
+    var q=inp.value.trim().toLowerCase();
     if(q.length<1){hide(res);return;}
-    if(q===lastQuery)return;
-    lastQuery=q;
-    call('searchDirectory',[q]).then(function(results){
-      if(inp.value.trim()!==q)return; // stale result, user typed more
-      if(!results||results.length===0){
-        res.innerHTML='<div class="search-empty">No matches</div>';show(res);return;
-      }
-      res.innerHTML='';
-      results.forEach(function(r){
-        var row=document.createElement('div');row.className='search-row';
-        var hasAcct=r.hasAccount?'<span class="acct-icon" title="Has account">'+acctSvg+'</span>':'';
-        row.innerHTML='<div class="search-row-main"><div class="search-row-name">'+esc(r.display_name)+hasAcct+'</div><div class="search-row-email">'+esc(r.email)+'</div></div>';
-        // mousedown fires BEFORE blur, so the selection always registers
-        row.onmousedown=function(ev){ev.preventDefault();onSelect(r);hide(res);inp.value='';lastQuery='';};
-        res.appendChild(row);
-      });
-      show(res);
-    }).catch(function(){});
+    var dir=directoryCache||[];
+    var excluded={};
+    if(getExcludedEmails){(getExcludedEmails()||[]).forEach(function(e){excluded[String(e).toLowerCase()]=true;});}
+    var matches=dir.filter(function(p){
+      if(excluded[String(p.email).toLowerCase()])return false;
+      var hay=((p.display_name||'')+' '+(p.first_name||'')+' '+(p.last_name||'')+' '+(p.email||'')).toLowerCase();
+      return hay.indexOf(q)>=0;
+    }).slice(0,12);
+    if(matches.length===0){
+      res.innerHTML='<div class="search-empty">No matches</div>';show(res);return;
+    }
+    res.innerHTML='';
+    matches.forEach(function(r){
+      var row=document.createElement('div');row.className='search-row';
+      var hasAcct=r.hasAccount?'<span class="acct-icon" title="Has account">'+acctSvg+'</span>':'';
+      row.innerHTML='<div class="search-row-main"><div class="search-row-name">'+esc(r.display_name)+hasAcct+'</div><div class="search-row-email">'+esc(r.hasRealEmail?r.email:'No email')+'</div></div>';
+      row.onmousedown=function(ev){ev.preventDefault();onSelect(r);hide(res);inp.value='';};
+      res.appendChild(row);
+    });
+    show(res);
   }
-  inp.oninput=function(){clearTimeout(timer);timer=setTimeout(runSearch,120);};
-  inp.onfocus=function(){if(inp.value.trim().length>=1){lastQuery='';runSearch();}};
+  inp.oninput=function(){clearTimeout(timer);timer=setTimeout(render,30);};
+  inp.onfocus=function(){loadDirectory().then(function(){if(inp.value.trim())render();});};
   inp.onblur=function(){setTimeout(function(){hide(res);},150);};
 }
 
@@ -1612,7 +1730,7 @@ async function sendRequest(){if(busy)return;var text=$('rq-text').value.trim();i
 function showAccountMenu(){
   if(!state.user)return;
   var msg='<div style="margin-bottom:12px;">Signed in as<br><strong>'+esc(state.user.email)+'</strong></div>';
-  if(state.user.isGlobalAdmin)msg+='<div style="margin-bottom:16px;"><button class="btn-text" id="acct-invite" style="color:var(--c-tint);font-weight:600;">✉ Send Invite</button></div>';
+  msg+='<div style="margin-bottom:16px;"><button class="btn-text" id="acct-invite" style="color:var(--c-tint);font-weight:600;">✉ Invite People</button></div>';
   msg+='<div><button class="btn-text" id="acct-signout" style="color:var(--c-danger);">Sign Out</button></div>';
   $('confirm-msg').innerHTML=msg;openModal('modal-confirm');
   $('confirm-yes').style.display='none';$('confirm-no').textContent='Close';
@@ -1666,11 +1784,22 @@ function wireAll(){
 
   // Trip modals
   wireModal('modal-new-trip','nt-cancel');$('nt-save').onclick=saveNewTrip;$('nt-add-row').onclick=function(){addNtRow('','');};
-  setupSearch('nt-search','nt-search-results',function(r){addNtRow(r.display_name||r.first_name+' '+r.last_name,r.email);});
+  setupSearch('nt-search','nt-search-results',function(r){
+    addNtRow(r.display_name||r.first_name+' '+r.last_name,r.hasRealEmail?r.email:'');
+  },function(){
+    // exclude emails already added as participant rows
+    return ntParticipants.map(function(p){return p.email;}).filter(Boolean);
+  });
   wireModal('modal-edit-trip','et-cancel');$('et-save').onclick=saveEditTrip;$('et-delete').onclick=deleteTrip;
   wireModal('modal-switch','sw-cancel');
   wireModal('modal-add-person','ap-cancel');$('ap-save').onclick=saveAddPerson;
-  setupSearch('ap-search','ap-search-results',function(r){$('ap-email').value=r.email||'';$('ap-name').value=r.display_name||r.first_name+' '+r.last_name;});
+  setupSearch('ap-search','ap-search-results',function(r){
+    $('ap-email').value=r.hasRealEmail?(r.email||''):'';
+    $('ap-name').value=r.display_name||((r.first_name||'')+' '+(r.last_name||'')).trim();
+  },function(){
+    // exclude people already in the current trip
+    return state.trip?(state.trip.participants||[]).map(function(p){return p.email;}):[];
+  });
   wireModal('modal-include-exp','ie-cancel');$('ie-save').onclick=saveIncludeExpenses;
   qsa('input[name="include-mode"]').forEach(function(radio){radio.onchange=function(){if(this.value==='select')show('ie-expense-list');else hide('ie-expense-list');};});
   wireModal('modal-edit-person','ep-cancel');$('ep-save').onclick=saveEditPerson;$('ep-delete').onclick=deleteEditPerson;
@@ -1685,7 +1814,14 @@ function wireAll(){
   $('es-select-all').onclick=function(){qsa('#es-list input[type="checkbox"]:not(:disabled)').forEach(function(cb){cb.checked=true;});};
   $('es-select-none').onclick=function(){qsa('#es-list input[type="checkbox"]:not(:disabled)').forEach(function(cb){cb.checked=false;});};
   $('es-add-missing').onclick=startAddMissingEmails;$('es-ae-save').onclick=addMissingEmail;$('es-ae-skip').onclick=skipMissingEmail;
-  wireModal('modal-invite','inv-cancel');$('inv-send').onclick=sendInvite;
+  wireModal('modal-invite','inv-cancel');$('inv-send').onclick=sendInvites;
+  $('inv-add-manual').onclick=addManualToInviteList;
+  setupSearch('inv-search','inv-search-results',function(r){
+    addToInviteList({email:r.email,firstName:r.first_name,lastName:r.last_name,displayName:r.display_name,hasAccount:r.hasAccount});
+  },function(){
+    // exclude people already chosen, plus people who already have accounts are shown but blocked on select
+    return inviteList.map(function(p){return p.email;});
+  });
   wireModal('modal-request','rq-cancel');$('rq-send').onclick=sendRequest;
   document.addEventListener('click',function(ev){var btn=ev.target.closest('[data-action]');if(!btn)return;var action=btn.dataset.action;var rowId=btn.dataset.rowid;if(!rowId)return;if(action==='approve')approveExpense(rowId);else if(action==='edit')editExpense(rowId);});
 }
