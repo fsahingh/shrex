@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
@@ -165,6 +168,15 @@ input,select,textarea{font:inherit;color:var(--c-text);}
 .trip-lock svg{width:18px;height:18px;}
 .trip-lock.locked{color:var(--c-warn);}
 .trip-lock.unlocked{color:var(--c-success);}
+.trip-bell{position:relative;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;width:32px;height:32px;border-radius:8px;}
+.trip-bell svg{width:18px;height:18px;}
+.trip-bell{color:var(--c-success);}
+.trip-bell.has-req{color:var(--c-warn);background:rgba(255,149,0,0.12);}
+.trip-bell.has-req:active{background:rgba(255,149,0,0.25);}
+.trip-bell-count{position:absolute;top:-2px;right:-2px;min-width:16px;height:16px;
+  background:var(--c-warn);color:#fff;font-size:10px;font-weight:700;
+  border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;}
 .trip-edit-btn{width:32px;height:32px;border-radius:8px;display:flex;
   align-items:center;justify-content:center;color:var(--c-edit);
   background:rgba(239,142,45,0.12);transition:.1s;flex-shrink:0;}
@@ -496,6 +508,8 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
 .pr-reject:active{background:var(--c-border);}
 
 .app-version{text-align:center;font-size:11px;color:var(--c-text-3);margin-top:20px;opacity:.6;}
+/* Refresh button turns green when a newer app version is available */
+.header-btn.update-ready{color:var(--c-success);}
 [hidden]{display:none!important;}
 </style>
 </head>
@@ -1048,8 +1062,49 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
 (function(){
 'use strict';
 
-// App version — bump on every release so we can verify what a device runs.
-var APP_VERSION='C-2.6';
+// App version — bump on every release. Must match setAppVersion() in Code.gs.
+var APP_VERSION='C-2.7';
+
+// True when the server reports a newer version than this build.
+var updateAvailable=false;
+
+// Compares this build to the server's latest; if newer, flags update.
+function checkAppVersion(latest){
+  latest=String(latest||'').trim();
+  if(latest&&latest!==APP_VERSION){
+    updateAvailable=true;
+  }else{
+    updateAvailable=false;
+  }
+  applyUpdateHint();
+}
+// Turns refresh buttons green when an update is waiting.
+function applyUpdateHint(){
+  ['btn-refresh','btn-refresh-trips','btn-requests-refresh'].forEach(function(id){
+    var btn=$(id);
+    if(btn)btn.classList.toggle('update-ready',updateAvailable);
+  });
+}
+// Hard reload that bypasses cache (best-effort across browsers/iOS web-app).
+function hardReload(){
+  try{
+    if(window.caches&&caches.keys){
+      caches.keys().then(function(keys){
+        keys.forEach(function(k){caches.delete(k);});
+      }).catch(function(){}).then(function(){doReload();});
+    }else{doReload();}
+  }catch(e){doReload();}
+}
+function doReload(){
+  // Cache-busting query param forces the iOS web-app to refetch index.html
+  try{
+    var u=new URL(window.location.href);
+    u.searchParams.set('v',Date.now());
+    window.location.replace(u.toString());
+  }catch(e){
+    window.location.reload();
+  }
+}
 
 // ============================================================
 //  TOKEN MANAGEMENT — localStorage (own domain, no iframe issues)
@@ -1083,6 +1138,7 @@ var chevronSvg='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stro
 var acctSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
 var lockClosedSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
 var lockOpenSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>';
+var bellSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
 
 var toastTimer=null;
 function toast(msg,danger){var t=$('toast');t.textContent=msg;t.className='toast'+(danger?' danger':'');show(t);clearTimeout(toastTimer);toastTimer=setTimeout(function(){hide(t)},3000);}
@@ -1347,6 +1403,7 @@ async function boot(){
     state.user=data.user||{};state.trips=data.trips||[];
     state.pendingCount=data.pendingRegistrations||0;
     state.pendingRequests=data.pendingRequests||0;
+    checkAppVersion(data.latestAppVersion);
     var dn=state.user.displayName||state.user.email||'?';
     $('avatar-name').textContent=dn;$('avatar-name-2').textContent=dn;
     updatePendingBadge();updateDirectoryButton();updateRequestsBadge();
@@ -1633,6 +1690,14 @@ function renderTripList(){
     // Settle lock indicator — closed/orange if settled, open/green if active
     var lockIcon='<span class="trip-lock '+(t.settled?'locked':'unlocked')+'" title="'+(t.settled?'Settled':'Active')+'">'
       +(t.settled?lockClosedSvg:lockOpenSvg)+'</span>';
+    // Per-trip request bell — only for trip admins. Green=clear, orange=pending.
+    var bellIcon='';
+    if(t.isAdmin){
+      var rc=t.pendingRequestCount||0;
+      bellIcon='<button class="trip-bell '+(rc>0?'has-req':'')+'" data-trip-bell="'+t.trip_id+'" title="'
+        +(rc>0?(rc+' change request'+(rc!==1?'s':'')):'No requests')+'">'
+        +bellSvg+(rc>0?'<span class="trip-bell-count">'+rc+'</span>':'')+'</button>';
+    }
     // Creator line — shown to global admin (so they see who owns each trip)
     var creatorLine='';
     if(state.user.isGlobalAdmin&&t.createdByName){
@@ -1647,12 +1712,15 @@ function renderTripList(){
       +'</button>'
       +'<div class="trip-card-right">'
       +'<span class="balance-pill '+pillClass+'">'+pillText+'</span>'
+      +bellIcon
       +lockIcon
       +editBtn
       +'</div></div>';
     c.appendChild(card);
   });
   c.onclick=function(ev){
+    var bellBtn=ev.target.closest('[data-trip-bell]');
+    if(bellBtn){ev.stopPropagation();openRequestsPage();return;}
     var editBtn=ev.target.closest('[data-trip-edit]');
     if(editBtn){ev.stopPropagation();openEditTrip(editBtn.dataset.tripEdit);return;}
     var openBtn=ev.target.closest('[data-trip-open]');
@@ -2224,8 +2292,8 @@ function wireAll(){
   // Navigation
   $('btn-home').onclick=function(){hide('view-trip');show('view-trips');state.currentView='trips';if(state.trip)show('btn-back');renderTripList();updateFab();};
   $('btn-back').onclick=function(){if(state.trip){hide('view-trips');show('view-trip');state.currentView='trip';switchTab(state.activeTab);updateFab();}};
-  $('btn-refresh').onclick=function(){refreshTrip(state.activeTab);};
-  $('btn-refresh-trips').onclick=async function(){showSpinner('Refreshing trips…');try{var data=await call('bootData');state.trips=data.trips||[];state.pendingCount=data.pendingRegistrations||0;state.pendingRequests=data.pendingRequests||0;updatePendingBadge();updateRequestsBadge();renderTripList();toast('Refreshed');}catch(err){toast('Refresh failed',true);}hideSpinner();};
+  $('btn-refresh').onclick=function(){if(updateAvailable){hardReload();return;}refreshTrip(state.activeTab);};
+  $('btn-refresh-trips').onclick=async function(){if(updateAvailable){hardReload();return;}showSpinner('Refreshing trips…');try{var data=await call('bootData');state.trips=data.trips||[];state.pendingCount=data.pendingRegistrations||0;state.pendingRequests=data.pendingRequests||0;checkAppVersion(data.latestAppVersion);updatePendingBadge();updateRequestsBadge();renderTripList();toast('Refreshed');}catch(err){toast('Refresh failed',true);}hideSpinner();};
   $('btn-trip-pill').onclick=openSwitchTrip;
   qsa('.tab').forEach(function(t){t.onclick=function(){switchTab(t.dataset.tab);};});
   var acctHandler=function(){showAccountMenu();};
@@ -2318,7 +2386,7 @@ function wireAll(){
   $('btn-requests').onclick=openRequestsPage;
   $('btn-requests-2').onclick=openRequestsPage;
   $('btn-requests-back').onclick=exitRequestsPage;
-  $('btn-requests-refresh').onclick=function(){$('requests-content').innerHTML='<div class="loading">Loading requests…</div>';loadRequests();};
+  $('btn-requests-refresh').onclick=function(){if(updateAvailable){hardReload();return;}$('requests-content').innerHTML='<div class="loading">Loading requests…</div>';loadRequests();};
   document.addEventListener('click',function(ev){var btn=ev.target.closest('[data-action]');if(!btn)return;var action=btn.dataset.action;var rowId=btn.dataset.rowid;if(!rowId)return;if(action==='approve')approveExpense(rowId);else if(action==='edit')editExpense(rowId);else if(action==='request')requestExpenseChange(rowId);});
 }
 
