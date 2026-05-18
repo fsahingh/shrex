@@ -41,14 +41,22 @@ button{font:inherit;cursor:pointer;border:none;background:none;color:inherit;}
 input,select,textarea{font:inherit;color:var(--c-text);}
 
 /* PULL TO REFRESH */
-.ptr-indicator{position:fixed;top:calc(var(--safe-t) + var(--header-h));left:0;right:0;z-index:95;
-  display:flex;flex-direction:column;align-items:center;padding:0;
-  transform:translateY(-60px);transition:transform .2s;pointer-events:none;}
-.ptr-indicator.visible{transform:translateY(0);}
+.ptr-indicator{position:fixed;top:0;left:0;right:0;bottom:0;z-index:95;
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:none;opacity:0;transition:opacity .15s;}
+.ptr-indicator.visible{opacity:1;}
+.ptr-box{display:flex;flex-direction:column;align-items:center;gap:14px;
+  background:var(--c-surface);border-radius:20px;padding:28px 36px;
+  box-shadow:0 12px 40px rgba(0,0,0,0.22);}
 .ptr-indicator.loading .ptr-spinner{animation:spin .8s linear infinite;}
-.ptr-spinner{width:24px;height:24px;border:2.5px solid var(--c-border);border-top-color:var(--c-tint);
-  border-radius:50%;margin:8px 0 4px;transition:transform .2s;}
-.ptr-text{font-size:12px;color:var(--c-text-2);font-weight:500;padding-bottom:6px;}
+.ptr-spinner{width:46px;height:46px;border:4px solid var(--c-border);
+  border-top-color:var(--c-tint);border-radius:50%;transition:transform .1s;}
+.ptr-text{font-size:15px;color:var(--c-text);font-weight:600;}
+/* Page blurs progressively as it is pulled down */
+body.ptr-blurring #view-trips,
+body.ptr-blurring #view-trip,
+body.ptr-blurring #view-requests{
+  filter:blur(var(--ptr-blur,0px));transition:filter .1s;}
 
 /* SPLASH */
 .splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;
@@ -488,12 +496,19 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
 #btn-requests.has-pending .badge,#btn-requests-2.has-pending .badge{background:var(--c-warn);}
 
 /* REQUEST CARDS */
-.req-card{background:var(--c-card);border-radius:var(--r);padding:16px;
-  margin-bottom:12px;box-shadow:var(--shadow);}
-.req-card-head{display:flex;justify-content:space-between;align-items:baseline;}
-.req-trip{font-size:16px;font-weight:700;}
-.req-date{font-size:12px;color:var(--c-text-3);}
-.req-by{font-size:13px;color:var(--c-text-2);margin:2px 0 12px;}
+.req-card{background:var(--c-card);border-radius:var(--r);
+  margin-bottom:10px;box-shadow:var(--shadow);overflow:hidden;}
+.req-head{display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;}
+.req-head-main{flex:1;min-width:0;}
+.req-head-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+.req-trip{font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.req-date{font-size:12px;color:var(--c-text-3);flex-shrink:0;}
+.req-by{font-size:12px;color:var(--c-text-2);margin-top:2px;}
+.req-chevron{color:var(--c-text-3);display:flex;align-items:center;
+  flex-shrink:0;transition:transform .15s;}
+.req-chevron svg{width:18px;height:18px;}
+.req-chevron.open{transform:rotate(180deg);}
+.req-body{padding:0 16px 16px;}
 .req-diff{background:var(--c-bg);border-radius:var(--r-sm);padding:4px 12px;}
 .req-field{padding:9px 0;border-bottom:0.5px solid var(--c-border);}
 .req-field:last-child{border-bottom:none;}
@@ -548,12 +563,22 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
   border-bottom:0.5px solid var(--c-border);}
 .incl-row:last-child{border-bottom:none;}
 .incl-row.disabled{opacity:.55;}
+.incl-row.incl-changed{background:rgba(255,149,0,0.13);
+  margin:0 -8px;padding-left:12px;padding-right:12px;border-radius:8px;}
 .incl-row input[type="checkbox"]{width:20px;height:20px;flex-shrink:0;accent-color:var(--c-tint);}
 .incl-row-main{display:flex;flex-direction:column;min-width:0;}
 .incl-row-desc{font-size:14px;font-weight:500;}
 .incl-row-sub{font-size:11px;color:var(--c-text-2);margin-top:1px;}
 .incl-req-tag{color:var(--c-warn);font-weight:600;}
 
+.field-invalid{border-color:var(--c-danger)!important;
+  box-shadow:0 0 0 3px rgba(255,59,48,0.15)!important;}
+.update-icon{width:54px;height:54px;border-radius:50%;margin:0 auto 14px;
+  background:var(--c-tint-bg);color:var(--c-tint);
+  display:flex;align-items:center;justify-content:center;}
+.update-icon svg{width:28px;height:28px;}
+.update-title{font-size:18px;font-weight:700;margin-bottom:6px;}
+.update-sub{font-size:14px;color:var(--c-text-2);line-height:1.5;}
 [hidden]{display:none!important;}
 </style>
 </head>
@@ -561,8 +586,10 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
 
 <!-- PULL TO REFRESH INDICATOR -->
 <div id="ptr-indicator" class="ptr-indicator">
-  <div class="ptr-spinner"></div>
-  <div class="ptr-text">Pull to refresh</div>
+  <div class="ptr-box">
+    <div class="ptr-spinner"></div>
+    <div class="ptr-text">Pull to refresh</div>
+  </div>
 </div>
 
 <!-- ============================== -->
@@ -760,7 +787,7 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
   </div>
   <div class="tab-bar">
     <button class="tab active" data-tab="settlement">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 7h18M7 7l-3 7a4 4 0 0 0 6 0L7 7zM17 7l-3 7a4 4 0 0 0 6 0l-3-7z"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
       <span>Settlement</span>
     </button>
     <button class="tab" data-tab="expenses">
@@ -1128,17 +1155,47 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
   </div>
 </div>
 
+<!-- SETTLE BLOCKED BY PENDING REQUESTS -->
+<div class="modal" id="modal-settle-requests" hidden>
+  <div class="modal-backdrop"></div>
+  <div class="modal-sheet modal-sheet-tall"><div class="modal-handle"></div>
+    <div class="modal-title">Resolve requests first</div>
+    <div class="incl-hint">This trip has pending change requests. Approve or reject each one before settling.</div>
+    <div class="modal-body" id="sr-list"></div>
+    <div class="modal-actions"><button class="btn-secondary full" id="sr-close">Close</button></div>
+  </div>
+</div>
+
+<!-- UPDATE AVAILABLE -->
+<div class="modal" id="modal-update" hidden>
+  <div class="modal-backdrop"></div>
+  <div class="modal-sheet modal-sheet-sm"><div class="modal-handle"></div>
+    <div class="modal-body" style="text-align:center;padding:26px 20px 8px;">
+      <div class="update-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </div>
+      <div class="update-title">New version available</div>
+      <div class="update-sub">A newer version of the app is ready. Update now to get the latest features and fixes.</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="update-cancel">Later</button>
+      <button class="btn-primary" id="update-now">Update Now</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
 'use strict';
 
 // App version — bump on every release. Must match setAppVersion() in Code.gs.
-var APP_VERSION='C-2.8';
+var APP_VERSION='C-3.0';
 
 // True when the server reports a newer version than this build.
 var updateAvailable=false;
 
 // Compares this build to the server's latest; if newer, flags update.
+var updateDismissed=false;   // user tapped Cancel on the update popup
 function checkAppVersion(latest){
   latest=String(latest||'').trim();
   if(latest&&latest!==APP_VERSION){
@@ -1147,6 +1204,7 @@ function checkAppVersion(latest){
     updateAvailable=false;
   }
   applyUpdateHint();
+  if(updateAvailable)maybeShowUpdatePopup();
 }
 // Turns refresh buttons green when an update is waiting.
 function applyUpdateHint(){
@@ -1154,6 +1212,39 @@ function applyUpdateHint(){
     var btn=$(id);
     if(btn)btn.classList.toggle('update-ready',updateAvailable);
   });
+}
+// Shows the update popup once; if the user cancels, an idle auto-update kicks in.
+function maybeShowUpdatePopup(){
+  if(updateDismissed)return;
+  if($('modal-update')&&!$('modal-update').hidden)return;
+  showUpdatePopup();
+}
+function showUpdatePopup(){
+  openModal('modal-update');
+}
+// True when it's safe to auto-reload: no modal open and no text field focused.
+function isIdleForUpdate(){
+  // Any visible modal other than the update modal itself?
+  var modals=document.querySelectorAll('.modal:not([hidden])');
+  for(var i=0;i<modals.length;i++){
+    if(modals[i].id!=='modal-update')return false;
+  }
+  var ae=document.activeElement;
+  if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.tagName==='SELECT'))return false;
+  if(busy)return false;
+  return true;
+}
+// After the user cancels, poll quietly and reload when they're idle.
+var idleUpdateTimer=null;
+function startIdleUpdateWatch(){
+  if(idleUpdateTimer)return;
+  idleUpdateTimer=setInterval(function(){
+    if(!updateAvailable){clearInterval(idleUpdateTimer);idleUpdateTimer=null;return;}
+    if(isIdleForUpdate()){
+      clearInterval(idleUpdateTimer);idleUpdateTimer=null;
+      hardReload();
+    }
+  },4000);
 }
 // Hard reload that bypasses cache (best-effort across browsers/iOS web-app).
 function hardReload(){
@@ -1203,6 +1294,10 @@ function fmt(n){return '$'+Number(n||0).toFixed(2);}
 function shortDate(iso){if(!iso)return '';try{var d=new Date(iso);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});}catch(e){return '';}}
 function esc(s){if(!s)return '';var d=document.createElement('div');d.appendChild(document.createTextNode(String(s)));return d.innerHTML;}
 function showErr(id,msg){var el=$(id);if(el){el.textContent=msg;show(el);}}
+// Briefly outlines a field in red to draw attention to a missing/invalid value
+function highlightField(id){var el=$(id);if(!el)return;el.classList.add('field-invalid');
+  setTimeout(function(){el.classList.remove('field-invalid');},2000);
+  try{el.focus();}catch(e){}}
 var noEmailSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M21 8V21H3V8l9 6 9-6"/><path d="M3 8l9-6 9 6"/></svg>';
 var pencilSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
 var chevronSvg='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
@@ -1292,16 +1387,53 @@ function clearPinRow(rowId){qsa('.pin-box',$(rowId)).forEach(function(b){b.value
 // ============================================================
 //  PULL TO REFRESH
 // ============================================================
-var ptrState={startY:0,pulling:false,triggered:false};var PTR_THRESHOLD=70;
+var ptrState={startY:0,pulling:false,triggered:false};
+var PTR_THRESHOLD=140;   // longer pull required (was 70) — less accidental triggering
+var PTR_START=20;        // ignore tiny drags below this
 function setupPullToRefresh(){
   var indicator=$('ptr-indicator');var ptrText=indicator.querySelector('.ptr-text');
-  document.addEventListener('touchstart',function(e){if(document.scrollingElement.scrollTop>5)return;if(document.querySelector('.modal:not([hidden])'))return;ptrState.startY=e.touches[0].clientY;ptrState.pulling=true;ptrState.triggered=false;},{passive:true});
-  document.addEventListener('touchmove',function(e){if(!ptrState.pulling)return;var dy=e.touches[0].clientY-ptrState.startY;if(dy<0){ptrState.pulling=false;indicator.classList.remove('visible');return;}if(dy>10){indicator.classList.add('visible');indicator.querySelector('.ptr-spinner').style.transform='rotate('+Math.min(dy*2,360)+'deg)';ptrText.textContent=dy>PTR_THRESHOLD?'Release to refresh':'Pull to refresh';ptrState.triggered=dy>PTR_THRESHOLD;}},{passive:true});
-  document.addEventListener('touchend',function(){if(!ptrState.pulling)return;ptrState.pulling=false;if(ptrState.triggered){indicator.classList.add('loading');indicator.querySelector('.ptr-text').textContent='Loading data…';doPullRefresh().then(function(){indicator.classList.remove('visible','loading');});}else{indicator.classList.remove('visible');}},{passive:true});
+  document.addEventListener('touchstart',function(e){
+    if(document.scrollingElement.scrollTop>5)return;
+    if(document.querySelector('.modal:not([hidden])'))return;
+    ptrState.startY=e.touches[0].clientY;ptrState.pulling=true;ptrState.triggered=false;
+  },{passive:true});
+  document.addEventListener('touchmove',function(e){
+    if(!ptrState.pulling)return;
+    var dy=e.touches[0].clientY-ptrState.startY;
+    if(dy<0){endPtrVisual();ptrState.pulling=false;return;}
+    if(dy>PTR_START){
+      indicator.classList.add('visible');
+      // Progress 0..1 toward the threshold
+      var progress=Math.min(dy/PTR_THRESHOLD,1);
+      indicator.querySelector('.ptr-spinner').style.transform='rotate('+(progress*330)+'deg)';
+      indicator.style.opacity=String(0.4+progress*0.6);
+      // Progressively blur the page as you pull
+      document.body.style.setProperty('--ptr-blur',(progress*5).toFixed(1)+'px');
+      document.body.classList.add('ptr-blurring');
+      ptrText.textContent=dy>PTR_THRESHOLD?'Release to refresh':'Pull to refresh';
+      ptrState.triggered=dy>PTR_THRESHOLD;
+    }
+  },{passive:true});
+  document.addEventListener('touchend',function(){
+    if(!ptrState.pulling)return;ptrState.pulling=false;
+    if(ptrState.triggered){
+      indicator.classList.add('loading');indicator.style.opacity='1';
+      ptrText.textContent='Refreshing…';
+      doPullRefresh().then(function(){endPtrVisual();});
+    }else{endPtrVisual();}
+  },{passive:true});
+}
+function endPtrVisual(){
+  var indicator=$('ptr-indicator');
+  indicator.classList.remove('visible','loading');
+  indicator.style.opacity='';
+  document.body.classList.remove('ptr-blurring');
+  document.body.style.setProperty('--ptr-blur','0px');
 }
 async function doPullRefresh(){
   if(state.currentView==='trip'&&state.trip){await refreshTrip(state.activeTab);}
-  else if(state.currentView==='trips'){try{var data=await call('bootData');state.trips=data.trips||[];state.pendingCount=data.pendingRegistrations||0;state.pendingRequests=data.pendingRequests||0;updatePendingBadge();updateRequestsBadge();renderTripList();toast('Refreshed');}catch(err){toast('Refresh failed',true);}}
+  else if(state.currentView==='trips'){try{var data=await call('bootData');state.trips=data.trips||[];state.pendingCount=data.pendingRegistrations||0;state.pendingRequests=data.pendingRequests||0;checkAppVersion(data.latestAppVersion);updatePendingBadge();updateRequestsBadge();renderTripList();toast('Refreshed');}catch(err){toast('Refresh failed',true);}}
+  else if(state.currentView==='requests'){await loadRequests();}
 }
 
 // ============================================================
@@ -1312,7 +1444,7 @@ function updateFab(){
   if(state.currentView==='trips'){show(fab);fab.onclick=openNewTrip;}
   else if(state.currentView==='trip'){
     if(state.activeTab==='expenses'&&state.trip&&!state.trip.settled){show(fab);fab.onclick=function(){openExpenseModal(null);};}
-    else if(state.activeTab==='people'&&state.trip&&state.trip.isAdmin&&!state.trip.settled){show(fab);fab.onclick=function(){$('ap-name').value='';$('ap-email').value='';$('ap-search').value='';hide('ap-error');hide('ap-search-results');openModal('modal-add-person');};}
+    else if(state.activeTab==='people'&&state.trip&&state.trip.isAdmin&&!state.trip.settled){show(fab);fab.onclick=function(){$('ap-name').value='';$('ap-email').value='';$('ap-search').value='';apPicked=null;hide('ap-error');hide('ap-search-results');openModal('modal-add-person');};}
     else{hide(fab);}
   }else{hide(fab);}
 }
@@ -1599,6 +1731,7 @@ async function loadRequests(){
     $('requests-content').innerHTML='<div class="empty-state"><div class="empty-title">Could not load</div><div class="empty-sub">'+esc(err.message||'Error')+'</div></div>';
   }
 }
+var expandedRequests={}; // request_id -> true when expanded
 function renderRequests(){
   var el=$('requests-content');
   var list=state.requests||[];
@@ -1608,23 +1741,41 @@ function renderRequests(){
   }
   var h='';
   list.forEach(function(rq){
-    h+='<div class="req-card glass-card" data-req="'+rq.request_id+'">';
-    h+='<div class="req-card-head"><span class="req-trip">'+esc(rq.trip_name)+'</span>'
+    var open=expandedRequests[rq.request_id];
+    h+='<div class="req-card'+(open?' open':'')+'" data-req="'+rq.request_id+'">';
+    // Compact header — always visible, tappable
+    h+='<div class="req-head" data-req-toggle="'+rq.request_id+'">';
+    h+='<div class="req-head-main">';
+    h+='<div class="req-head-top"><span class="req-trip">'+esc(rq.trip_name)+'</span>'
       +'<span class="req-date">'+shortDate(rq.requested_at)+'</span></div>';
-    h+='<div class="req-by">Requested by '+esc(rq.requested_by_name)+'</div>';
-    h+=renderRequestDiff(rq.old,rq.new);
-    h+='<div class="req-actions">'
-      +'<button class="req-reject" data-req-reject="'+rq.request_id+'">Reject</button>'
-      +'<button class="req-approve" data-req-approve="'+rq.request_id+'">Approve</button>'
-      +'</div>';
+    h+='<div class="req-by">by '+esc(rq.requested_by_name)+'</div>';
+    h+='</div>';
+    h+='<span class="req-chevron'+(open?' open':'')+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>';
+    h+='</div>';
+    // Expanded body
+    if(open){
+      h+='<div class="req-body">';
+      h+=renderRequestDiff(rq.old,rq.new);
+      h+='<div class="req-actions">'
+        +'<button class="req-reject" data-req-reject="'+rq.request_id+'">Reject</button>'
+        +'<button class="req-approve" data-req-approve="'+rq.request_id+'">Approve</button>'
+        +'</div>';
+      h+='</div>';
+    }
     h+='</div>';
   });
   el.innerHTML=h;
   el.onclick=function(ev){
     var ap=ev.target.closest('[data-req-approve]');
+    if(ap){handleApproveRequest(ap.dataset.reqApprove);return;}
     var rj=ev.target.closest('[data-req-reject]');
-    if(ap)handleApproveRequest(ap.dataset.reqApprove);
-    if(rj)handleRejectRequest(rj.dataset.reqReject);
+    if(rj){handleRejectRequest(rj.dataset.reqReject);return;}
+    var tg=ev.target.closest('[data-req-toggle]');
+    if(tg){
+      var rid=tg.dataset.reqToggle;
+      expandedRequests[rid]=!expandedRequests[rid];
+      renderRequests();
+    }
   };
 }
 // Renders a before/after comparison; only changed fields are highlighted.
@@ -1658,8 +1809,8 @@ async function handleApproveRequest(reqId){
     toast('Change applied');
     state.pendingRequests=Math.max(0,(state.pendingRequests||1)-1);
     updateRequestsBadge();
-    await loadRequests();
-    // refresh current trip data if loaded
+    if(settleReqTripId){await reloadSettleRequests();}
+    else{await loadRequests();}
     if(state.trip){try{var d=await call('getFullTripData',[state.trip.trip_id]);if(d){state.trip=d;renderSettlement();renderExpenses();renderPeople();}}catch(e){}}
   }catch(err){toast(err.message||'Error',true);}
   hideSpinner();busy=false;
@@ -1672,10 +1823,85 @@ async function handleRejectRequest(reqId){
     toast('Request rejected');
     state.pendingRequests=Math.max(0,(state.pendingRequests||1)-1);
     updateRequestsBadge();
-    await loadRequests();
+    if(settleReqTripId){await reloadSettleRequests();}
+    else{await loadRequests();}
     if(state.trip){try{var d=await call('getFullTripData',[state.trip.trip_id]);if(d){state.trip=d;renderExpenses();}}catch(e){}}
   }catch(err){toast(err.message||'Error',true);}
   hideSpinner();busy=false;
+}
+
+// ============================================================
+//  SETTLE — resolve pending requests before settling
+// ============================================================
+var settleReqTripId=null;
+async function openSettleRequestsModal(tripId){
+  settleReqTripId=tripId;
+  $('sr-list').innerHTML='<div class="loading">Loading…</div>';
+  openModal('modal-settle-requests');
+  await reloadSettleRequests();
+}
+async function reloadSettleRequests(){
+  if(!settleReqTripId)return;
+  try{
+    var list=await call('listTripExpenseRequests',[settleReqTripId]);
+    renderSettleRequests(list||[]);
+    // All resolved? Offer to settle now.
+    if((list||[]).length===0){
+      var tid=settleReqTripId;
+      closeModal('modal-settle-requests');
+      settleReqTripId=null;
+      var ok=await confirm_('All requests resolved. Settle the trip now?');
+      if(ok){
+        showSpinner('Settling…');
+        try{await call('settleTrip',[tid]);toast('Trip settled!');}
+        catch(err){toast(err.message||'Error',true);}
+        hideSpinner();
+        if(state.trip&&String(state.trip.trip_id)===String(tid))await refreshTrip('settlement');
+      }
+    }
+  }catch(err){
+    $('sr-list').innerHTML='<div class="empty-state"><div class="empty-title">Error</div><div class="empty-sub">'+esc(err.message||'')+'</div></div>';
+  }
+}
+function renderSettleRequests(list){
+  var el=$('sr-list');
+  if(!list||list.length===0){el.innerHTML='';return;}
+  var h='';
+  list.forEach(function(rq){
+    var open=expandedRequests['sr_'+rq.request_id];
+    h+='<div class="req-card'+(open?' open':'')+'">';
+    h+='<div class="req-head" data-sr-toggle="'+rq.request_id+'">';
+    h+='<div class="req-head-main">';
+    h+='<div class="req-head-top"><span class="req-trip">'+esc(rq.trip_name)+'</span>'
+      +'<span class="req-date">'+shortDate(rq.requested_at)+'</span></div>';
+    h+='<div class="req-by">by '+esc(rq.requested_by_name)+'</div>';
+    h+='</div>';
+    h+='<span class="req-chevron'+(open?' open':'')+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>';
+    h+='</div>';
+    if(open){
+      h+='<div class="req-body">';
+      h+=renderRequestDiff(rq.old,rq.new);
+      h+='<div class="req-actions">'
+        +'<button class="req-reject" data-req-reject="'+rq.request_id+'">Reject</button>'
+        +'<button class="req-approve" data-req-approve="'+rq.request_id+'">Approve</button>'
+        +'</div>';
+      h+='</div>';
+    }
+    h+='</div>';
+  });
+  el.innerHTML=h;
+  el.onclick=function(ev){
+    var ap=ev.target.closest('[data-req-approve]');
+    if(ap){handleApproveRequest(ap.dataset.reqApprove);return;}
+    var rj=ev.target.closest('[data-req-reject]');
+    if(rj){handleRejectRequest(rj.dataset.reqReject);return;}
+    var tg=ev.target.closest('[data-sr-toggle]');
+    if(tg){
+      var k='sr_'+tg.dataset.srToggle;
+      expandedRequests[k]=!expandedRequests[k];
+      renderSettleRequests(list);
+    }
+  };
 }
 function exitRequestsPage(){
   hide('view-requests');
@@ -1853,7 +2079,23 @@ function renderSettlement(){
   var sf=$('stat-fair-share');if(sf)sf.onclick=function(){openFairShareModal();};
   var sb=$('stat-balance');if(sb)sb.onclick=function(){openBalanceModal();};
   qsa('.tx-group-header',el).forEach(function(header){header.onclick=function(){var details=header.nextElementSibling;var chev=header.querySelector('.tx-group-chevron');if(details.hidden){show(details);chev.classList.add('open');}else{hide(details);chev.classList.remove('open');}};});
-  var btnSettle=$('btn-settle');if(btnSettle)btnSettle.onclick=async function(){var ok=await confirm_('Settle this trip?');if(!ok)return;showSpinner('Settling…');try{await call('settleTrip',[d.trip_id]);toast('Trip settled!');}catch(err){toast(err.message||'Error',true);}await refreshTrip('settlement');};
+  var btnSettle=$('btn-settle');if(btnSettle)btnSettle.onclick=async function(){
+    var ok=await confirm_('Settle this trip?');if(!ok)return;
+    showSpinner('Settling…');
+    try{
+      await call('settleTrip',[d.trip_id]);
+      toast('Trip settled!');
+      hideSpinner();
+      await refreshTrip('settlement');
+    }catch(err){
+      hideSpinner();
+      if(err&&err.message&&err.message.indexOf('PENDING_REQUESTS')>=0){
+        openSettleRequestsModal(d.trip_id);
+      }else{
+        toast(err.message||'Error',true);
+      }
+    }
+  };
   var btnUnsettle=$('btn-unsettle');if(btnUnsettle)btnUnsettle.onclick=async function(){var ok=await confirm_('Reopen this trip?');if(!ok)return;showSpinner('Reopening…');try{await call('unsettleTrip',[d.trip_id]);toast('Trip reopened');}catch(err){toast(err.message||'Error',true);}await refreshTrip('settlement');};
   var btnShare=$('btn-share');if(btnShare)btnShare.onclick=function(){openEmailSelectModal();};
 }
@@ -1981,6 +2223,8 @@ var expenseModalMode='add';
 var expenseOriginal=null; // snapshot for request-mode change detection
 function openExpenseModal(exp,mode){
   var d=state.trip;if(!d)return;var sel=$('ex-paid-by');sel.innerHTML='';
+  // Placeholder so the user must consciously pick who paid
+  var ph=document.createElement('option');ph.value='';ph.textContent='— Select who paid —';sel.appendChild(ph);
   d.participants.forEach(function(p){var o=document.createElement('option');o.value=p.email;o.textContent=p.short_name||p.display_name;sel.appendChild(o);});
   expenseModalMode=mode||(exp?'edit':'add');
   expenseOriginal=null;
@@ -1989,7 +2233,7 @@ function openExpenseModal(exp,mode){
     if(exp.split_with_all||!exp.split_with||exp.split_with.length===0){qs('input[name="split-mode"][value="everyone"]').checked=true;hide('ex-split-wrap');}
     else{qs('input[name="split-mode"][value="custom"]').checked=true;show('ex-split-wrap');populateSplitList(exp.split_with);}
   }else{
-    $('ex-row-id').value='';$('ex-desc').value='';$('ex-amount').value='';sel.value=d.currentUser.email;
+    $('ex-row-id').value='';$('ex-desc').value='';$('ex-amount').value='';sel.value='';
     qs('input[name="split-mode"][value="everyone"]').checked=true;hide('ex-split-wrap');
   }
   // Title, delete button, save button label depend on mode
@@ -2036,7 +2280,9 @@ function checkExpenseChanged(){
 async function saveExpense(){
   if(busy)return;var d=state.trip;if(!d)return;
   var desc=$('ex-desc').value.trim();var amount=$('ex-amount').value;var paidBy=$('ex-paid-by').value;
-  if(!desc){showErr('ex-error','Description required.');return;}if(!amount||Number(amount)<=0){showErr('ex-error','Valid amount required.');return;}
+  if(!desc){showErr('ex-error','Description required.');return;}
+  if(!amount||Number(amount)<=0){showErr('ex-error','Valid amount required.');return;}
+  if(!paidBy){showErr('ex-error','Please choose who paid.');highlightField('ex-paid-by');return;}
   var splitMode=qs('input[name="split-mode"]:checked').value;var splitWith=null;
   if(splitMode==='custom'){splitWith=[];qsa('#ex-split-list input[type="checkbox"]:checked').forEach(function(cb){splitWith.push(cb.value);});if(splitWith.length===0){showErr('ex-error','Select at least one person.');return;}}
   var rowId=$('ex-row-id').value;
@@ -2127,7 +2373,9 @@ function personIcons(p,isAdmin){
 // ============================================================
 //  INCLUSION MODAL — expenses a person is included in
 // ============================================================
-var inclusionTarget=null; // {email, displayName, isAdminEdit}
+var inclusionTarget=null;   // {email, displayName, isAdminEdit, canEdit}
+var inclusionOriginal={};   // row_id -> original included (true/false)
+var inclusionPending={};    // row_id -> desired included (admin batch edits)
 function openInclusionModal(personEmail){
   var d=state.trip;if(!d)return;
   var person=(d.participants||[]).find(function(p){return p.email===personEmail;});
@@ -2135,20 +2383,22 @@ function openInclusionModal(personEmail){
   var isMe=personEmail===d.currentUser.email;
   var isAdminEdit=d.isAdmin&&!d.settled;
   var canEdit=isAdminEdit||(isMe&&!d.settled);
-  inclusionTarget={email:personEmail,displayName:person.display_name,isAdminEdit:isAdminEdit};
+  inclusionTarget={email:personEmail,displayName:person.display_name,isAdminEdit:isAdminEdit,canEdit:canEdit};
+  inclusionOriginal={};inclusionPending={};
   $('incl-title').textContent=person.display_name;
   if(!canEdit){
     $('incl-hint').textContent='Expenses '+(isMe?'you are':'this person is')+' included in.';
   }else if(isAdminEdit){
-    $('incl-hint').textContent='Tick or untick to change who shares each expense. Changes apply immediately.';
+    $('incl-hint').textContent='Tick or untick expenses, then tap Apply Changes. Edited rows are highlighted.';
   }else{
     $('incl-hint').textContent='Untick an expense to request being removed from it. A request will be sent to the admin.';
   }
   hide('incl-error');
-  renderInclusionList(canEdit);
+  renderInclusionList();
+  updateInclusionActions();
   openModal('modal-inclusion');
 }
-function renderInclusionList(canEdit){
+function renderInclusionList(){
   var d=state.trip;if(!d||!inclusionTarget)return;
   var email=inclusionTarget.email;
   var allEmails=(d.participants||[]).map(function(p){return p.email;});
@@ -2162,70 +2412,154 @@ function renderInclusionList(canEdit){
   actives.forEach(function(e){
     var splitWith=e.split_with_all?allEmails.slice():(e.split_with||[]);
     if(splitWith.length===0)splitWith=allEmails.slice();
-    var included=splitWith.indexOf(email)>=0;
+    var origIncluded=splitWith.indexOf(email)>=0;
+    inclusionOriginal[e.row_id]=origIncluded;
+    // For admin batch mode, the displayed state is the pending desired value
+    var shown=(inclusionPending[e.row_id]!=null)?inclusionPending[e.row_id]:origIncluded;
     var hasReq=e.hasPendingRequest;
-    var disabled=!canEdit||hasReq;
-    h+='<label class="incl-row'+(disabled?' disabled':'')+'">';
-    h+='<input type="checkbox" data-incl-row="'+esc(e.row_id)+'"'+(included?' checked':'')+(disabled?' disabled':'')+'>';
+    var disabled=!inclusionTarget.canEdit||hasReq;
+    var isChanged=inclusionTarget.isAdminEdit&&(inclusionPending[e.row_id]!=null)&&(inclusionPending[e.row_id]!==origIncluded);
+    h+='<label class="incl-row'+(disabled?' disabled':'')+(isChanged?' incl-changed':'')+'">';
+    h+='<input type="checkbox" data-incl-row="'+esc(e.row_id)+'"'+(shown?' checked':'')+(disabled?' disabled':'')+'>';
     h+='<span class="incl-row-main"><span class="incl-row-desc">'+esc(e.description)+'</span>';
     h+='<span class="incl-row-sub">'+fmt(e.amount)+' · Paid by '+esc(e.paid_by_name)
       +(hasReq?' · <span class="incl-req-tag">change pending</span>':'')+'</span></span>';
     h+='</label>';
   });
   el.innerHTML=h;
-  if(canEdit){
+  if(inclusionTarget.canEdit){
     el.onchange=function(ev){
       var cb=ev.target.closest('[data-incl-row]');
       if(cb)handleInclusionToggle(cb.dataset.inclRow,cb.checked,cb);
     };
   }
 }
-async function handleInclusionToggle(rowId,checked,cb){
+// Shows/hides the "Apply Changes" button based on pending admin edits.
+function updateInclusionActions(){
+  var actionsEl=$('incl-actions');
+  if(!inclusionTarget||!inclusionTarget.isAdminEdit){
+    actionsEl.innerHTML='<button class="btn-secondary full" id="incl-close">Close</button>';
+    $('incl-close').onclick=function(){closeModal('modal-inclusion');};
+    return;
+  }
+  var changeCount=0;
+  Object.keys(inclusionPending).forEach(function(rid){
+    if(inclusionPending[rid]!==inclusionOriginal[rid])changeCount++;
+  });
+  if(changeCount>0){
+    actionsEl.innerHTML='<button class="btn-secondary" id="incl-close">Close</button>'
+      +'<button class="btn-primary" id="incl-apply">Apply Changes ('+changeCount+')</button>';
+    $('incl-apply').onclick=applyInclusionChanges;
+  }else{
+    actionsEl.innerHTML='<button class="btn-secondary full" id="incl-close">Close</button>';
+  }
+  $('incl-close').onclick=function(){
+    if(changeCount>0){
+      confirm_('Discard '+changeCount+' unsaved change'+(changeCount!==1?'s':'')+'?').then(function(ok){
+        if(ok){inclusionPending={};closeModal('modal-inclusion');}
+      });
+    }else{closeModal('modal-inclusion');}
+  };
+}
+function handleInclusionToggle(rowId,checked,cb){
+  var d=state.trip;if(!d||!inclusionTarget)return;
+  hide('incl-error');
+  if(inclusionTarget.isAdminEdit){
+    // Admin: just record the desired state, don't hit the backend yet
+    inclusionPending[rowId]=checked;
+    renderInclusionList();
+    updateInclusionActions();
+  }else{
+    // User: each toggle is a deliberate change request
+    submitInclusionRequest(rowId,checked,cb);
+  }
+}
+// Admin: apply all batched inclusion changes in one pass.
+async function applyInclusionChanges(){
+  if(busy)return;
+  var d=state.trip;if(!d||!inclusionTarget)return;
+  var email=inclusionTarget.email;
+  var changes=[];
+  Object.keys(inclusionPending).forEach(function(rid){
+    if(inclusionPending[rid]!==inclusionOriginal[rid]){
+      changes.push({rowId:rid,include:inclusionPending[rid]});
+    }
+  });
+  if(changes.length===0)return;
+  busy=true;showSpinner('Applying '+changes.length+' change'+(changes.length!==1?'s':'')+'…');
+  var failed=0;
+  try{
+    for(var i=0;i<changes.length;i++){
+      try{await call('setExpenseParticipant',[d.trip_id,changes[i].rowId,email,changes[i].include]);}
+      catch(e){failed++;}
+    }
+    var fresh=await call('getFullTripData',[d.trip_id]);
+    if(fresh){state.trip=fresh;renderSettlement();renderExpenses();renderPeople();}
+  }finally{hideSpinner();busy=false;}
+  inclusionPending={};
+  if(failed===0){toast('Changes applied');closeModal('modal-inclusion');}
+  else{showErr('incl-error',failed+' change(s) failed. List refreshed.');renderInclusionList();updateInclusionActions();}
+}
+// User: send a single change request for their own inclusion.
+async function submitInclusionRequest(rowId,checked,cb){
   if(busy){cb.checked=!checked;return;}
   var d=state.trip;if(!d||!inclusionTarget)return;
   var email=inclusionTarget.email;
   var exp=(d.expenses||[]).find(function(e){return e.row_id===rowId;});
   if(!exp)return;
-  busy=true;hide('incl-error');
-  if(inclusionTarget.isAdminEdit){
-    // Admin: apply immediately
-    showSpinner('Updating…');
-    try{
-      await call('setExpenseParticipant',[d.trip_id,rowId,email,checked]);
-      var fresh=await call('getFullTripData',[d.trip_id]);
-      if(fresh){state.trip=fresh;renderSettlement();renderExpenses();}
-      toast('Updated');
-      renderPeople();
-      // re-render list with fresh data
-      renderInclusionList(true);
-    }catch(err){cb.checked=!checked;showErr('incl-error',err.message||'Error');}
-    hideSpinner();busy=false;
-  }else{
-    // User: build new split_with and send a change request
-    showSpinner('Sending request…');
-    var allEmails=(d.participants||[]).map(function(p){return p.email;});
-    var splitWith=exp.split_with_all?allEmails.slice():(exp.split_with||[]).slice();
-    if(splitWith.length===0)splitWith=allEmails.slice();
-    var idx=splitWith.indexOf(email);
-    if(checked&&idx<0)splitWith.push(email);
-    if(!checked&&idx>=0)splitWith.splice(idx,1);
-    try{
-      await call('submitExpenseChangeRequest',[d.trip_id,rowId,{
-        description:exp.description,amount:exp.amount,paid_by:exp.paid_by,split_with:splitWith
-      }]);
-      toast('Change request sent');
-      var fresh=await call('getFullTripData',[d.trip_id]);
-      if(fresh){state.trip=fresh;renderExpenses();
-        if(fresh.pendingRequests!=null){state.pendingRequests=fresh.pendingRequests;updateRequestsBadge();}}
-      renderPeople();
-      renderInclusionList(!d.settled); // user can still request on other expenses
-    }catch(err){cb.checked=!checked;showErr('incl-error',err.message||'Error');}
-    hideSpinner();busy=false;
-  }
+  busy=true;showSpinner('Sending request…');
+  var allEmails=(d.participants||[]).map(function(p){return p.email;});
+  var splitWith=exp.split_with_all?allEmails.slice():(exp.split_with||[]).slice();
+  if(splitWith.length===0)splitWith=allEmails.slice();
+  var idx=splitWith.indexOf(email);
+  if(checked&&idx<0)splitWith.push(email);
+  if(!checked&&idx>=0)splitWith.splice(idx,1);
+  var ok=false;
+  try{
+    await call('submitExpenseChangeRequest',[d.trip_id,rowId,{
+      description:exp.description,amount:exp.amount,paid_by:exp.paid_by,split_with:splitWith
+    }]);
+    ok=true;
+    var fresh=await call('getFullTripData',[d.trip_id]);
+    if(fresh){state.trip=fresh;renderExpenses();renderPeople();
+      if(fresh.pendingRequests!=null){state.pendingRequests=fresh.pendingRequests;updateRequestsBadge();}}
+  }catch(err){cb.checked=!checked;showErr('incl-error',err.message||'Error');}
+  finally{hideSpinner();busy=false;}
+  if(ok){toast('Change request sent');renderInclusionList();}
 }
 
+
 var pendingAddPerson=null;
-async function saveAddPerson(){if(busy)return;var name=$('ap-name').value.trim();var email=$('ap-email').value.trim();if(!name&&!email){showErr('ap-error','Name or email required.');return;}var d=state.trip;if(d&&d.hasExpenses){pendingAddPerson={name:name,email:email};closeModal('modal-add-person');openIncludeModal();return;}busy=true;showSpinner('Adding…');try{await call('addParticipantToTrip',[d.trip_id,email,name,'none']);toast('Added');closeModal('modal-add-person');loadDirectory(true);await refreshTrip('people');}catch(err){showErr('ap-error',err.message||'Error');hideSpinner();}busy=false;}
+var apPicked=null; // directory person picked in the add-person modal
+async function saveAddPerson(){
+  if(busy)return;
+  var name=$('ap-name').value.trim();var email=$('ap-email').value.trim().toLowerCase();
+  if(!name&&!email){showErr('ap-error','Name or email required.');return;}
+  var d=state.trip;if(!d)return;
+  // Prevent adding the same person twice
+  var existing=(d.participants||[]);
+  if(email&&existing.some(function(p){return (p.email||'').toLowerCase()===email;})){
+    showErr('ap-error','This person is already included in the trip.');return;
+  }
+  // For no-email people, check by name against other no-email participants
+  if(!email&&apPicked&&apPicked.first_name){
+    var nameKey=((apPicked.first_name||'')+'|'+(apPicked.last_name||'')).toLowerCase();
+    var dup=existing.some(function(p){
+      if(p.hasRealEmail)return false;
+      return ((p.first_name||'')+'|'+(p.last_name||'')).toLowerCase()===nameKey;
+    });
+    if(dup){showErr('ap-error','This person is already included in the trip.');return;}
+  }
+  if(d.hasExpenses){pendingAddPerson={name:name,email:email};closeModal('modal-add-person');openIncludeModal();return;}
+  busy=true;showSpinner('Adding…');
+  try{
+    await call('addParticipantToTrip',[d.trip_id,email,name,'none']);
+    toast('Added');closeModal('modal-add-person');
+    try{await loadDirectory(true);}catch(e){}
+    await refreshTrip('people');
+  }catch(err){showErr('ap-error',err.message||'Error');}
+  finally{hideSpinner();busy=false;}
+}
 function openIncludeModal(){qs('input[name="include-mode"][value="none"]').checked=true;hide('ie-expense-list');hide('ie-error');var el=$('ie-expense-list');el.innerHTML='';(state.trip.expenses||[]).filter(function(e){return e.status==='active';}).forEach(function(e){var item=document.createElement('label');item.className='ie-item';item.innerHTML='<input type="checkbox" value="'+esc(e.row_id)+'" checked> <span class="ie-item-desc">'+esc(e.description)+'</span><span class="ie-item-amount">'+fmt(e.amount)+'</span>';el.appendChild(item);});openModal('modal-include-exp');}
 async function saveIncludeExpenses(){if(busy||!pendingAddPerson)return;var mode=qs('input[name="include-mode"]:checked').value;var includeIn='none';if(mode==='all')includeIn='all';else if(mode==='select'){var ids=[];qsa('#ie-expense-list input[type="checkbox"]:checked').forEach(function(cb){ids.push(cb.value);});includeIn=ids.join(',')||'none';}busy=true;showSpinner('Adding…');try{await call('addParticipantToTrip',[state.trip.trip_id,pendingAddPerson.email,pendingAddPerson.name,includeIn]);toast('Added');closeModal('modal-include-exp');pendingAddPerson=null;loadDirectory(true);await refreshTrip('people');}catch(err){showErr('ie-error',err.message||'Error');hideSpinner();}busy=false;}
 
@@ -2312,21 +2646,25 @@ async function saveEditPerson(){
   var newEmail=$('ep-email').value.trim().toLowerCase();
   if(!first){showErr('ep-error','First name required.');return;}
   busy=true;showSpinner('Saving…');
+  var ok=false;
   try{
     await call('updateParticipantInfo',[editingPerson.email,first,last]);
     if(newEmail&&newEmail!==editingPerson.email){
-      // Email change needs a trip context; only do it when inside a trip
       if(state.trip&&!editingPersonFromDir){
         await call('updateParticipantEmail',[state.trip.trip_id,editingPerson.email,newEmail]);
       }else{
         await call('updateParticipantEmailGlobal',[editingPerson.email,newEmail]);
       }
     }
-    toast('Updated');closeModal('modal-edit-person');loadDirectory(true);
+    ok=true;
+  }catch(err){showErr('ep-error',err.message||'Error');}
+  finally{hideSpinner();busy=false;}
+  if(ok){
+    toast('Updated');closeModal('modal-edit-person');
+    try{await loadDirectory(true);}catch(e){}
     if(editingPersonFromDir){openDirectory();}
     else{await refreshTrip('people');}
-  }catch(err){showErr('ep-error',err.message||'Error');hideSpinner();}
-  busy=false;
+  }
 }
 async function deleteEditPerson(){
   if(!editingPerson)return;
@@ -2543,6 +2881,22 @@ function wireAll(){
   var acctHandler=function(){showAccountMenu();};
   $('btn-account').onclick=acctHandler;$('btn-account-2').onclick=acctHandler;
 
+  // Update-available modal
+  $('update-now').onclick=function(){hardReload();};
+  $('update-cancel').onclick=function(){
+    updateDismissed=true;
+    closeModal('modal-update');
+    startIdleUpdateWatch();
+  };
+  qs('.modal-backdrop',$('modal-update')).onclick=function(){
+    updateDismissed=true;closeModal('modal-update');startIdleUpdateWatch();
+  };
+  // Settle-blocked-by-requests modal
+  $('sr-close').onclick=function(){settleReqTripId=null;closeModal('modal-settle-requests');};
+  qs('.modal-backdrop',$('modal-settle-requests')).onclick=function(){
+    settleReqTripId=null;closeModal('modal-settle-requests');
+  };
+
   // Welcome auth buttons
   $('btn-goto-register').onclick=function(){showPanel('welcome-register');$('reg-first').focus();};
   $('btn-goto-signin').onclick=function(){showPanel('welcome-signin');$('si-first').focus();};
@@ -2595,7 +2949,10 @@ function wireAll(){
   wireModal('modal-add-person','ap-cancel');$('ap-save').onclick=saveAddPerson;
   setupSearch('ap-search','ap-search-results',function(r){
     $('ap-email').value=r.hasRealEmail?(r.email||''):'';
-    $('ap-name').value=r.display_name||((r.first_name||'')+' '+(r.last_name||'')).trim();
+    // Use the FULL first + last name, not the abbreviated display_name
+    $('ap-name').value=((r.first_name||'')+' '+(r.last_name||'')).trim()||r.display_name||'';
+    // Remember the picked person so save uses their exact identity
+    apPicked={email:r.hasRealEmail?(r.email||''):'',first_name:r.first_name||'',last_name:r.last_name||'',hasAccount:r.hasAccount};
   },function(){
     // exclude people already in the current trip
     return state.trip?(state.trip.participants||[]).map(function(p){return p.email;}):[];
@@ -2604,7 +2961,14 @@ function wireAll(){
   qsa('input[name="include-mode"]').forEach(function(radio){radio.onchange=function(){if(this.value==='select')show('ie-expense-list');else hide('ie-expense-list');};});
   wireModal('modal-edit-person','ep-cancel');$('ep-save').onclick=saveEditPerson;$('ep-delete').onclick=deleteEditPerson;
   wireModal('modal-person-trips','pt-close');
-  wireModal('modal-inclusion','incl-close');
+  // Inclusion modal: close button is rebuilt dynamically; only wire the backdrop
+  qs('.modal-backdrop',$('modal-inclusion')).onclick=function(){
+    var hasPending=inclusionTarget&&inclusionTarget.isAdminEdit&&
+      Object.keys(inclusionPending).some(function(rid){return inclusionPending[rid]!==inclusionOriginal[rid];});
+    if(hasPending){
+      confirm_('Discard unsaved changes?').then(function(ok){if(ok){inclusionPending={};closeModal('modal-inclusion');}});
+    }else{closeModal('modal-inclusion');}
+  };
   wireModal('modal-expense','ex-cancel');$('ex-save').onclick=saveExpense;$('ex-delete').onclick=deleteExpenseFromModal;
   qsa('input[name="split-mode"]').forEach(function(radio){radio.onchange=function(){if(this.value==='custom'){show('ex-split-wrap');populateSplitList([]);}else{hide('ex-split-wrap');}checkExpenseChanged();};});
   $('ex-select-all').onclick=function(){qsa('#ex-split-list input[type="checkbox"]').forEach(function(cb){cb.checked=true;});checkExpenseChanged();};
