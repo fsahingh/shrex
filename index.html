@@ -267,7 +267,13 @@ body.ptr-blurring #view-requests{
 .exp-split-title{font-size:11px;font-weight:600;color:var(--c-text-3);
   text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px;}
 .exp-split-row{display:flex;align-items:center;gap:10px;padding:7px 2px;}
+.exp-split-row.exp-split-changed{background:rgba(255,149,0,0.13);
+  margin:0 -6px;padding-left:8px;padding-right:8px;border-radius:6px;}
 .exp-split-row input[type="checkbox"]{width:18px;height:18px;flex-shrink:0;accent-color:var(--c-tint);}
+.exp-split-actions{display:flex;gap:8px;margin-top:10px;padding-top:10px;
+  border-top:0.5px solid var(--c-border);}
+.exp-split-actions button{flex:1;padding:9px;font-size:13px;font-weight:600;
+  border-radius:9px;min-height:38px;}
 .exp-split-dot{width:18px;height:18px;border-radius:50%;flex-shrink:0;
   border:1.5px solid var(--c-border);display:flex;align-items:center;justify-content:center;
   font-size:11px;color:#fff;}
@@ -927,8 +933,16 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
         <input type="text" id="ap-search" class="field" placeholder="Search directory…" autocomplete="off">
         <div id="ap-search-results" class="search-results" hidden></div>
       </div>
-      <label class="field-label">Name</label>
-      <input type="text" id="ap-name" class="field" placeholder="Full name" maxlength="80">
+      <div class="field-row">
+        <div class="field-col">
+          <label class="field-label">First name</label>
+          <input type="text" id="ap-first" class="field" maxlength="40">
+        </div>
+        <div class="field-col">
+          <label class="field-label">Last name</label>
+          <input type="text" id="ap-last" class="field" maxlength="40">
+        </div>
+      </div>
       <label class="field-label">Email (optional)</label>
       <input type="email" id="ap-email" class="field" placeholder="email@example.com">
       <div class="err" id="ap-error" hidden></div>
@@ -1189,7 +1203,7 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
 'use strict';
 
 // App version — bump on every release. Must match setAppVersion() in Code.gs.
-var APP_VERSION='C-3.0';
+var APP_VERSION='C-3.1';
 
 // True when the server reports a newer version than this build.
 var updateAvailable=false;
@@ -1284,6 +1298,7 @@ var authToken='';
 
 var state={user:null,trips:[],trip:null,activeTab:'settlement',currentView:'welcome',pendingCount:0};
 var expandedExpenses={}; // row_id -> true when an expense card is expanded
+var expenseSplitPending={}; // row_id -> {email: desiredIncluded} for admin batch edits
 var busy=false;
 var $=function(s){return document.getElementById(s)};
 var qs=function(s,ctx){return(ctx||document).querySelector(s)};
@@ -1444,7 +1459,7 @@ function updateFab(){
   if(state.currentView==='trips'){show(fab);fab.onclick=openNewTrip;}
   else if(state.currentView==='trip'){
     if(state.activeTab==='expenses'&&state.trip&&!state.trip.settled){show(fab);fab.onclick=function(){openExpenseModal(null);};}
-    else if(state.activeTab==='people'&&state.trip&&state.trip.isAdmin&&!state.trip.settled){show(fab);fab.onclick=function(){$('ap-name').value='';$('ap-email').value='';$('ap-search').value='';apPicked=null;hide('ap-error');hide('ap-search-results');openModal('modal-add-person');};}
+    else if(state.activeTab==='people'&&state.trip&&state.trip.isAdmin&&!state.trip.settled){show(fab);fab.onclick=function(){$('ap-first').value='';$('ap-last').value='';$('ap-email').value='';$('ap-search').value='';apPicked=null;hide('ap-error');hide('ap-search-results');openModal('modal-add-person');};}
     else{hide(fab);}
   }else{hide(fab);}
 }
@@ -2183,20 +2198,37 @@ function renderExpenses(){
       // Expanded participant list
       if(isOpen){
         var canEditSplit=d.isAdmin&&!d.settled&&!e.hasPendingRequest;
+        var pend=expenseSplitPending[e.row_id]||{};
         h+='<div class="exp-split-panel">';
-        h+='<div class="exp-split-title">Split between'+(canEditSplit?' — tap to change':'')+'</div>';
+        h+='<div class="exp-split-title">Split between'+(canEditSplit?' — tap a name to change':'')+'</div>';
         allEmails.forEach(function(em){
-          var inc=splitWith.indexOf(em)>=0;
-          h+='<label class="exp-split-row'+(canEditSplit?'':' readonly')+'">';
+          var origInc=splitWith.indexOf(em)>=0;
+          var shown=(pend[em]!=null)?pend[em]:origInc;
+          var isChanged=canEditSplit&&(pend[em]!=null)&&(pend[em]!==origInc);
+          h+='<label class="exp-split-row'+(canEditSplit?'':' readonly')+(isChanged?' exp-split-changed':'')+'">';
           if(canEditSplit){
-            h+='<input type="checkbox" data-exp-split="'+e.row_id+'" data-exp-email="'+esc(em)+'"'+(inc?' checked':'')+'>';
+            h+='<input type="checkbox" data-exp-split="'+e.row_id+'" data-exp-email="'+esc(em)+'"'+(shown?' checked':'')+'>';
           }else{
-            h+='<span class="exp-split-dot'+(inc?' on':'')+'">'+(inc?'✓':'')+'</span>';
+            h+='<span class="exp-split-dot'+(shown?' on':'')+'">'+(shown?'✓':'')+'</span>';
           }
-          h+='<span class="exp-split-name'+(inc?'':' dim')+'">'+esc(nameByEmail[em]||em)+'</span>';
-          h+='<span class="exp-split-share">'+(inc?fmt(e.amount/splitWith.length):'—')+'</span>';
+          h+='<span class="exp-split-name'+(shown?'':' dim')+'">'+esc(nameByEmail[em]||em)+'</span>';
+          h+='<span class="exp-split-share">'+(shown?fmt(e.amount/Math.max(1,countShownSplit(e,allEmails,pend))):'—')+'</span>';
           h+='</label>';
         });
+        // Apply Changes bar — only when there are pending edits for this expense
+        if(canEditSplit){
+          var changeCount=0;
+          allEmails.forEach(function(em){
+            var origInc=splitWith.indexOf(em)>=0;
+            if(pend[em]!=null&&pend[em]!==origInc)changeCount++;
+          });
+          if(changeCount>0){
+            h+='<div class="exp-split-actions">'
+              +'<button class="btn-secondary" data-exp-split-discard="'+e.row_id+'">Discard</button>'
+              +'<button class="btn-primary" data-exp-split-apply="'+e.row_id+'">Apply Changes ('+changeCount+')</button>'
+              +'</div>';
+          }
+        }
         h+='</div>';
       }
       if(e.status==='pending'&&d.isAdmin)h+='<div class="exp-approve-row"><button class="exp-btn-approve" data-action="approve" data-rowid="'+e.row_id+'">✓ Approve</button></div>';
@@ -2533,27 +2565,32 @@ var pendingAddPerson=null;
 var apPicked=null; // directory person picked in the add-person modal
 async function saveAddPerson(){
   if(busy)return;
-  var name=$('ap-name').value.trim();var email=$('ap-email').value.trim().toLowerCase();
-  if(!name&&!email){showErr('ap-error','Name or email required.');return;}
+  var first=$('ap-first').value.trim();
+  var last=$('ap-last').value.trim();
+  var email=$('ap-email').value.trim().toLowerCase();
+  if(!first&&!email){showErr('ap-error','First name or email required.');return;}
   var d=state.trip;if(!d)return;
-  // Prevent adding the same person twice
+  // Prevent adding the same person twice — by email if present
   var existing=(d.participants||[]);
   if(email&&existing.some(function(p){return (p.email||'').toLowerCase()===email;})){
     showErr('ap-error','This person is already included in the trip.');return;
   }
-  // For no-email people, check by name against other no-email participants
-  if(!email&&apPicked&&apPicked.first_name){
-    var nameKey=((apPicked.first_name||'')+'|'+(apPicked.last_name||'')).toLowerCase();
+  // For no-email people, check by first+last name
+  if(!email&&first){
+    var nameKey=(first+'|'+last).toLowerCase();
     var dup=existing.some(function(p){
       if(p.hasRealEmail)return false;
       return ((p.first_name||'')+'|'+(p.last_name||'')).toLowerCase()===nameKey;
     });
     if(dup){showErr('ap-error','This person is already included in the trip.');return;}
   }
-  if(d.hasExpenses){pendingAddPerson={name:name,email:email};closeModal('modal-add-person');openIncludeModal();return;}
+  if(d.hasExpenses){
+    pendingAddPerson={first:first,last:last,email:email};
+    closeModal('modal-add-person');openIncludeModal();return;
+  }
   busy=true;showSpinner('Adding…');
   try{
-    await call('addParticipantToTrip',[d.trip_id,email,name,'none']);
+    await call('addParticipantToTrip',[d.trip_id,email,first,last,'none']);
     toast('Added');closeModal('modal-add-person');
     try{await loadDirectory(true);}catch(e){}
     await refreshTrip('people');
@@ -2561,7 +2598,7 @@ async function saveAddPerson(){
   finally{hideSpinner();busy=false;}
 }
 function openIncludeModal(){qs('input[name="include-mode"][value="none"]').checked=true;hide('ie-expense-list');hide('ie-error');var el=$('ie-expense-list');el.innerHTML='';(state.trip.expenses||[]).filter(function(e){return e.status==='active';}).forEach(function(e){var item=document.createElement('label');item.className='ie-item';item.innerHTML='<input type="checkbox" value="'+esc(e.row_id)+'" checked> <span class="ie-item-desc">'+esc(e.description)+'</span><span class="ie-item-amount">'+fmt(e.amount)+'</span>';el.appendChild(item);});openModal('modal-include-exp');}
-async function saveIncludeExpenses(){if(busy||!pendingAddPerson)return;var mode=qs('input[name="include-mode"]:checked').value;var includeIn='none';if(mode==='all')includeIn='all';else if(mode==='select'){var ids=[];qsa('#ie-expense-list input[type="checkbox"]:checked').forEach(function(cb){ids.push(cb.value);});includeIn=ids.join(',')||'none';}busy=true;showSpinner('Adding…');try{await call('addParticipantToTrip',[state.trip.trip_id,pendingAddPerson.email,pendingAddPerson.name,includeIn]);toast('Added');closeModal('modal-include-exp');pendingAddPerson=null;loadDirectory(true);await refreshTrip('people');}catch(err){showErr('ie-error',err.message||'Error');hideSpinner();}busy=false;}
+async function saveIncludeExpenses(){if(busy||!pendingAddPerson)return;var mode=qs('input[name="include-mode"]:checked').value;var includeIn='none';if(mode==='all')includeIn='all';else if(mode==='select'){var ids=[];qsa('#ie-expense-list input[type="checkbox"]:checked').forEach(function(cb){ids.push(cb.value);});includeIn=ids.join(',')||'none';}busy=true;showSpinner('Adding…');try{await call('addParticipantToTrip',[state.trip.trip_id,pendingAddPerson.email,pendingAddPerson.first,pendingAddPerson.last,includeIn]);toast('Added');closeModal('modal-include-exp');pendingAddPerson=null;try{await loadDirectory(true);}catch(e){}await refreshTrip('people');}catch(err){showErr('ie-error',err.message||'Error');}finally{hideSpinner();busy=false;}}
 
 // ============================================================
 //  EDIT PERSON
@@ -2949,12 +2986,10 @@ function wireAll(){
   wireModal('modal-add-person','ap-cancel');$('ap-save').onclick=saveAddPerson;
   setupSearch('ap-search','ap-search-results',function(r){
     $('ap-email').value=r.hasRealEmail?(r.email||''):'';
-    // Use the FULL first + last name, not the abbreviated display_name
-    $('ap-name').value=((r.first_name||'')+' '+(r.last_name||'')).trim()||r.display_name||'';
-    // Remember the picked person so save uses their exact identity
+    $('ap-first').value=r.first_name||'';
+    $('ap-last').value=r.last_name||'';
     apPicked={email:r.hasRealEmail?(r.email||''):'',first_name:r.first_name||'',last_name:r.last_name||'',hasAccount:r.hasAccount};
   },function(){
-    // exclude people already in the current trip
     return state.trip?(state.trip.participants||[]).map(function(p){return p.email;}):[];
   });
   wireModal('modal-include-exp','ie-cancel');$('ie-save').onclick=saveIncludeExpenses;
@@ -2998,10 +3033,17 @@ function wireAll(){
   $('btn-requests-back').onclick=exitRequestsPage;
   $('btn-requests-refresh').onclick=function(){if(updateAvailable){hardReload();return;}$('requests-content').innerHTML='<div class="loading">Loading requests…</div>';loadRequests();};
   document.addEventListener('click',function(ev){var btn=ev.target.closest('[data-action]');if(!btn)return;var action=btn.dataset.action;var rowId=btn.dataset.rowid;if(!rowId)return;if(action==='approve')approveExpense(rowId);else if(action==='edit')editExpense(rowId);else if(action==='request')requestExpenseChange(rowId);});
-  // Expense card expand/collapse
+  // Expense card expand/collapse + split apply/discard
   $('tab-expenses').addEventListener('click',function(ev){
-    if(ev.target.closest('[data-action]'))return; // edit/approve buttons handled above
-    if(ev.target.closest('[data-exp-split]'))return; // checkbox handled by change
+    if(ev.target.closest('[data-action]'))return;
+    if(ev.target.closest('[data-exp-split]'))return;
+    var applyBtn=ev.target.closest('[data-exp-split-apply]');
+    if(applyBtn){applyExpenseSplitChanges(applyBtn.dataset.expSplitApply);return;}
+    var discardBtn=ev.target.closest('[data-exp-split-discard]');
+    if(discardBtn){
+      delete expenseSplitPending[discardBtn.dataset.expSplitDiscard];
+      renderExpenses();return;
+    }
     var toggle=ev.target.closest('[data-exp-toggle]');
     if(toggle){
       var rid=toggle.dataset.expToggle;
@@ -3009,24 +3051,61 @@ function wireAll(){
       renderExpenses();
     }
   });
-  // Expense split checkbox (admin only)
+  // Expense split checkbox — record pending change, don't hit backend yet
   $('tab-expenses').addEventListener('change',function(ev){
     var cb=ev.target.closest('[data-exp-split]');
-    if(cb)handleExpenseSplitToggle(cb.dataset.expSplit,cb.dataset.expEmail,cb.checked,cb);
+    if(cb)handleExpenseSplitToggle(cb.dataset.expSplit,cb.dataset.expEmail,cb.checked);
   });
 }
 
-async function handleExpenseSplitToggle(rowId,personEmail,checked,cb){
-  if(busy){cb.checked=!checked;return;}
+// Counts how many people are in an expense's split given pending edits.
+function countShownSplit(e,allEmails,pend){
+  var base=e.split_with_all?allEmails.slice():(e.split_with||[]);
+  if(base.length===0)base=allEmails.slice();
+  var n=0;
+  allEmails.forEach(function(em){
+    var orig=base.indexOf(em)>=0;
+    var shown=(pend&&pend[em]!=null)?pend[em]:orig;
+    if(shown)n++;
+  });
+  return n;
+}
+// Records a pending split change for an expense (admin batch mode).
+function handleExpenseSplitToggle(rowId,personEmail,checked){
+  if(!expenseSplitPending[rowId])expenseSplitPending[rowId]={};
+  expenseSplitPending[rowId][personEmail]=checked;
+  renderExpenses();
+}
+// Applies all batched split changes for one expense.
+async function applyExpenseSplitChanges(rowId){
+  if(busy)return;
   var d=state.trip;if(!d)return;
-  busy=true;showSpinner('Updating…');
+  var pend=expenseSplitPending[rowId];if(!pend)return;
+  var exp=(d.expenses||[]).find(function(e){return e.row_id===rowId;});
+  if(!exp)return;
+  var allEmails=(d.participants||[]).map(function(p){return p.email;});
+  var base=exp.split_with_all?allEmails.slice():(exp.split_with||[]).slice();
+  if(base.length===0)base=allEmails.slice();
+  var changes=[];
+  allEmails.forEach(function(em){
+    var orig=base.indexOf(em)>=0;
+    if(pend[em]!=null&&pend[em]!==orig)changes.push({email:em,include:pend[em]});
+  });
+  if(changes.length===0)return;
+  busy=true;showSpinner('Applying '+changes.length+' change'+(changes.length!==1?'s':'')+'…');
+  var failed=0;
   try{
-    await call('setExpenseParticipant',[d.trip_id,rowId,personEmail,checked]);
+    for(var i=0;i<changes.length;i++){
+      try{await call('setExpenseParticipant',[d.trip_id,rowId,changes[i].email,changes[i].include]);}
+      catch(e){failed++;}
+    }
     var fresh=await call('getFullTripData',[d.trip_id]);
-    if(fresh){state.trip=fresh;renderSettlement();renderExpenses();renderPeople();}
-    toast('Updated');
-  }catch(err){cb.checked=!checked;toast(err.message||'Error',true);}
-  hideSpinner();busy=false;
+    if(fresh){state.trip=fresh;renderSettlement();renderPeople();}
+  }finally{hideSpinner();busy=false;}
+  delete expenseSplitPending[rowId];
+  renderExpenses();
+  if(failed===0)toast('Changes applied');
+  else toast(failed+' change(s) failed',true);
 }
 
 setupPullToRefresh();
