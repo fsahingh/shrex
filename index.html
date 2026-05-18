@@ -385,7 +385,7 @@ body.ptr-blurring #view-requests{
 .field-label{font-size:12px;font-weight:600;color:var(--c-text-2);display:block;
   margin:12px 0 5px;text-transform:uppercase;letter-spacing:0.3px;}
 .field{width:100%;padding:12px 14px;border:1px solid var(--c-border);border-radius:var(--r-sm);
-  background:var(--c-bg);font-size:15px;min-height:44px;-webkit-appearance:none;}
+  background:var(--c-bg);font-size:16px;min-height:44px;-webkit-appearance:none;}
 .field:focus{outline:none;border-color:var(--c-tint);box-shadow:0 0 0 3px rgba(10,132,255,0.15);}
 textarea.field{resize:vertical;}
 select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236e6e73' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
@@ -1203,7 +1203,7 @@ select.field{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
 'use strict';
 
 // App version — bump on every release. Must match setAppVersion() in Code.gs.
-var APP_VERSION='C-3.2';
+var APP_VERSION='C-3.3';
 
 // True when the server reports a newer version than this build.
 var updateAvailable=false;
@@ -2511,18 +2511,26 @@ async function applyInclusionChanges(){
   if(busy)return;
   var d=state.trip;if(!d||!inclusionTarget)return;
   var email=inclusionTarget.email;
-  var changes=[];
+  var allEmails=(d.participants||[]).map(function(p){return p.email;});
+  // Collect changed expenses and compute each one's full new split list
+  var jobs=[];
   Object.keys(inclusionPending).forEach(function(rid){
-    if(inclusionPending[rid]!==inclusionOriginal[rid]){
-      changes.push({rowId:rid,include:inclusionPending[rid]});
-    }
+    if(inclusionPending[rid]===inclusionOriginal[rid])return;
+    var exp=(d.expenses||[]).find(function(e){return e.row_id===rid;});
+    if(!exp)return;
+    var base=exp.split_with_all?allEmails.slice():(exp.split_with||[]).slice();
+    if(base.length===0)base=allEmails.slice();
+    var idx=base.indexOf(email);
+    if(inclusionPending[rid]&&idx<0)base.push(email);
+    if(!inclusionPending[rid]&&idx>=0)base.splice(idx,1);
+    jobs.push({rowId:rid,split:base});
   });
-  if(changes.length===0)return;
-  busy=true;showSpinner('Applying '+changes.length+' change'+(changes.length!==1?'s':'')+'…');
+  if(jobs.length===0)return;
+  busy=true;showSpinner('Applying '+jobs.length+' change'+(jobs.length!==1?'s':'')+'…');
   var failed=0;
   try{
-    for(var i=0;i<changes.length;i++){
-      try{await call('setExpenseParticipant',[d.trip_id,changes[i].rowId,email,changes[i].include]);}
+    for(var i=0;i<jobs.length;i++){
+      try{await call('setExpenseSplit',[d.trip_id,jobs[i].rowId,jobs[i].split]);}
       catch(e){failed++;}
     }
     var fresh=await call('getFullTripData',[d.trip_id]);
@@ -3076,7 +3084,7 @@ function handleExpenseSplitToggle(rowId,personEmail,checked){
   expenseSplitPending[rowId][personEmail]=checked;
   renderExpenses();
 }
-// Applies all batched split changes for one expense.
+// Applies all batched split changes for one expense — in a SINGLE backend call.
 async function applyExpenseSplitChanges(rowId){
   if(busy)return;
   var d=state.trip;if(!d)return;
@@ -3086,26 +3094,26 @@ async function applyExpenseSplitChanges(rowId){
   var allEmails=(d.participants||[]).map(function(p){return p.email;});
   var base=exp.split_with_all?allEmails.slice():(exp.split_with||[]).slice();
   if(base.length===0)base=allEmails.slice();
-  var changes=[];
+  // Build the final desired split list from base + pending toggles
+  var finalSplit=[];
   allEmails.forEach(function(em){
     var orig=base.indexOf(em)>=0;
-    if(pend[em]!=null&&pend[em]!==orig)changes.push({email:em,include:pend[em]});
+    var shown=(pend[em]!=null)?pend[em]:orig;
+    if(shown)finalSplit.push(em);
   });
-  if(changes.length===0)return;
-  busy=true;showSpinner('Applying '+changes.length+' change'+(changes.length!==1?'s':'')+'…');
-  var failed=0;
+  if(finalSplit.length===0){toast('At least one person must be included',true);return;}
+  busy=true;showSpinner('Applying changes…');
+  var ok=false;
   try{
-    for(var i=0;i<changes.length;i++){
-      try{await call('setExpenseParticipant',[d.trip_id,rowId,changes[i].email,changes[i].include]);}
-      catch(e){failed++;}
-    }
+    await call('setExpenseSplit',[d.trip_id,rowId,finalSplit]);
     var fresh=await call('getFullTripData',[d.trip_id]);
     if(fresh){state.trip=fresh;renderSettlement();renderPeople();}
-  }finally{hideSpinner();busy=false;}
+    ok=true;
+  }catch(err){toast(err.message||'Error',true);}
+  finally{hideSpinner();busy=false;}
   delete expenseSplitPending[rowId];
   renderExpenses();
-  if(failed===0)toast('Changes applied');
-  else toast(failed+' change(s) failed',true);
+  if(ok)toast('Changes applied');
 }
 
 setupPullToRefresh();
